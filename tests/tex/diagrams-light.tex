@@ -1,0 +1,15 @@
+% The light-style diagram examples in every mode, at the text width they are
+% drawn for. Compiled by tests/test_latex.py with each engine; none may be
+% wider than the line.
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[diagrams]{pubviz}
+\input{../../examples/diagrams/looped}
+\input{../../examples/diagrams/asr}
+\input{../../examples/diagrams/retrieval}
+\newcommand\all{\looped\par\asr\par\retrieval\par}
+\begin{document}
+\all
+\pvsetup{mode=gray}\all
+\pvsetup{mode=plain}\all
+\end{document}

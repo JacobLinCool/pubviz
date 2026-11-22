@@ -1,0 +1,26 @@
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage{varwidth}
+\usepackage{pubviz}
+\newcommand\demo[1]{%
+  \begin{varwidth}[t]{10cm}
+  \centering
+  \textsf{\footnotesize mode=#1\strut}\par\smallskip
+  \pvsetup{mode=#1}%
+  \begin{pvtable}[delta=absolute]{lccc}
+    \toprule
+    Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+    \midrule
+    \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+    Prior A & 72.3 & 11.9 & 0.35 \\
+    Prior B & 71.6 & 12.8 & 0.22 \\
+    \pvours Ours & 74.0 & 10.2 & 0.28 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey[baseline=Base]
+  \end{varwidth}}
+\begin{document}
+\small
+\demo{color}\quad\demo{gray}\quad\demo{plain}
+\end{document}

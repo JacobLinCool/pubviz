@@ -1,0 +1,14 @@
+% Token shading in every mode, unsigned and signed, with the characters
+% pv.pvshade escapes. Compiled by tests/test_latex.py with each engine.
+\documentclass{article}
+\usepackage{pubviz}
+\newcommand\sentence{%
+  \pvshade{0.00}{The} \pvshade{0.35}{film} \pvshade{1.00}{was} \pvshade{0.62}{great}\par
+  \pvshade*{0.10}{not} \pvshade*{-1.00}{bad} \pvshade*{0.80}{at} \pvshade*{-0.30}{all}
+  \pvshade*{0.50}{\$5\_off \{x\}}\par}
+\begin{document}
+\sentence
+\pvsetup{mode=gray}\sentence
+\pvsetup{mode=plain}\sentence
+\pvsetup{mode=color, fill=none}\sentence
+\end{document}

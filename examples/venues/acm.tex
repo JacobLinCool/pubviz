@@ -1,0 +1,13 @@
+\documentclass[sigconf,nonacm]{acmart}
+\usepackage[diagrams]{pubviz}
+\newcommand\venue{acm}
+\title{pubviz example: ACM sigconf}
+\author{Example Author}
+\affiliation{\institution{Example University}\country{Taiwan}}
+\begin{document}
+\maketitle
+\input{../content}
+% acmart 2.16 (TeX Live 2026) drops floats still waiting at \end{document};
+% a \clearpage first flushes them. This happens without pubviz too.
+\clearpage
+\end{document}

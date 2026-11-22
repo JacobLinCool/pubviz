@@ -1,0 +1,97 @@
+% The Transformer (Vaswani et al., 2017), drawn with the pubviz diagram
+% styles to show a dense architecture figure in the shared colors. Needs
+% \usepackage[diagrams]{pubviz}. \transformer[<options>] draws it; the
+% options go to pvdiagram, for example
+%
+%   \transformer                                         blocks filled by kind
+%   \transformer[pv kinds=false, ffn/.append style={pv new}]
+%                                                        by role: only a new
+%                                                        feed-forward block is filled
+%
+% Every node is placed relative to another, so a longer label moves its
+% neighbours instead of overlapping them.
+\newcommand\transformer[1][]{%
+\begin{pvdiagram}[
+  pv kinds,
+  block/.style={pv block, minimum width=20mm, minimum height=2.6em},
+  thin/.style={pv block, minimum width=20mm, minimum height=1.4em, inner ysep=1.5pt},
+  % One kind per sort of layer; with pv kinds each gets its own light fill.
+  attention/.style={pv kind=1}, ffn/.style={pv kind=2}, norm/.style={pv kind=3},
+  embedding/.style={pv kind=4}, linear/.style={pv kind=5}, softmax/.style={pv kind=6},
+  #1]
+  % ---- encoder, bottom to top
+  \node[pv label] (in) {Inputs};
+  \node[block, embedding, above=4mm of in] (iemb) {Input\\Embedding};
+  \node[pv op, above=4mm of iemb] (iadd) {};
+  \node[pv wave, left=1.5mm of iadd] (ipe) {};
+  \node[pv label, left=0.5mm of ipe] {Positional\\Encoding};
+  \node[block, attention, above=12mm of iadd] (emha) {Multi-Head\\Attention};
+  \node[thin, norm, above=1mm of emha] (en1) {Add \& Norm};
+  \node[block, ffn, above=8mm of en1] (eff) {Feed\\Forward};
+  \node[thin, norm, above=1mm of eff] (en2) {Add \& Norm};
+  % ---- decoder, bottom to top
+  \node[pv label, anchor=north] (out) at ($(in.north)+(36mm,0)$) {Outputs\\(shifted right)};
+  \node[block, embedding, above=4mm of out] (oemb) {Output\\Embedding};
+  \node[pv op, above=4mm of oemb] (oadd) {};
+  \node[pv wave, right=1.5mm of oadd] (ope) {};
+  \node[pv label, right=0.5mm of ope] {Positional\\Encoding};
+  \node[block, attention, above=12mm of oadd, minimum height=3.7em] (dmha1) {Masked\\Multi-Head\\Attention};
+  \node[thin, norm, above=1mm of dmha1] (dn1) {Add \& Norm};
+  \node[block, attention, above=12mm of dn1] (dmha2) {Multi-Head\\Attention};
+  \node[thin, norm, above=1mm of dmha2] (dn2) {Add \& Norm};
+  \node[block, ffn, above=8mm of dn2] (dff) {Feed\\Forward};
+  \node[thin, norm, above=1mm of dff] (dn3) {Add \& Norm};
+  % ---- the repeated layers: a group box each, marked N times
+  \coordinate (ebottom) at ($(emha.south)+(0,-6.5mm)$);
+  \coordinate (dbottom) at ($(dmha1.south)+(0,-6.5mm)$);
+  \begin{scope}[on background layer]
+    \node[pv group, fit=(ebottom)(emha)(en2), inner xsep=5mm, inner ysep=3mm] (eg) {};
+    \node[pv group, fit=(dbottom)(dmha1)(dn3), inner xsep=5mm, inner ysep=3mm] (dg) {};
+  \end{scope}
+  \node[pv label, left=1.5mm of eg] {N$\times$};
+  \node[pv label, right=1.5mm of dg] {N$\times$};
+  % ---- output head
+  \node[thin, linear, above=5mm of dg] (lin) {Linear};
+  \node[thin, softmax, above=3mm of lin] (soft) {Softmax};
+  \node[pv label, above=4mm of soft] (prob) {Output\\Probabilities};
+  % ---- encoder edges
+  \draw[pv flow] (in) -- (iemb);
+  \draw[pv flow] (iemb) -- (iadd);
+  \draw[pv line] (ipe) -- (iadd);
+  \coordinate (ef1) at ($(emha.south)+(0,-4mm)$);    % queries, keys, values split here
+  \coordinate (er1) at ($(emha.south)+(0,-6mm)$);    % the residual leaves here
+  \draw[pv line] (iadd) -- (ef1);
+  \draw[pv flow] (ef1) -- (emha);
+  \draw[pv flow] (ef1) -| ($(emha.south)+(-6mm,0)$);
+  \draw[pv flow] (ef1) -| ($(emha.south)+(6mm,0)$);
+  \draw[pv flow] (er1) -| ($(en1.west)+(-3.5mm,0)$) -- (en1);
+  \coordinate (er2) at ($(en1.north)!0.4!(eff.south)$);
+  \draw[pv flow] (en1) -- (eff);
+  \draw[pv flow] (er2) -| ($(en2.west)+(-3.5mm,0)$) -- (en2);
+  % ---- decoder edges
+  \draw[pv flow] (out) -- (oemb);
+  \draw[pv flow] (oemb) -- (oadd);
+  \draw[pv line] (ope) -- (oadd);
+  \coordinate (df1) at ($(dmha1.south)+(0,-4mm)$);
+  \coordinate (dr1) at ($(dmha1.south)+(0,-6mm)$);
+  \draw[pv line] (oadd) -- (df1);
+  \draw[pv flow] (df1) -- (dmha1);
+  \draw[pv flow] (df1) -| ($(dmha1.south)+(-6mm,0)$);
+  \draw[pv flow] (df1) -| ($(dmha1.south)+(6mm,0)$);
+  \draw[pv flow] (dr1) -| ($(dn1.east)+(3.5mm,0)$) -- (dn1);
+  % Cross-attention: keys and values from the encoder, queries from below.
+  \coordinate (df2) at ($(dmha2.south)+(0,-4mm)$);
+  \coordinate (dr2) at ($(dn1.north)+(0,2mm)$);
+  \draw[pv flow] (dn1) -- ($(df2)+(0,-3mm)$) -| ($(dmha2.south)+(6mm,0)$);
+  \draw[pv flow] (dr2) -| ($(dn2.east)+(3.5mm,0)$) -- (dn2);
+  \coordinate (etop) at ($(en2.north |- eg.north)+(0,3mm)$);
+  \coordinate (gap) at ($(eg.east)!0.5!(dg.west)$);
+  \draw[pv flow] (en2) -- (etop) -| (gap |- df2) -| (dmha2.south);
+  \draw[pv flow] (en2) -- (etop) -| (gap |- df2) -| ($(dmha2.south)+(-6mm,0)$);
+  \coordinate (dr3) at ($(dn2.north)!0.4!(dff.south)$);
+  \draw[pv flow] (dn2) -- (dff);
+  \draw[pv flow] (dr3) -| ($(dn3.east)+(3.5mm,0)$) -- (dn3);
+  \draw[pv flow] (dn3) -- (lin);
+  \draw[pv flow] (lin) -- (soft);
+  \draw[pv flow] (soft) -- (prob);
+\end{pvdiagram}}

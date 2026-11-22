@@ -1,0 +1,90 @@
+% Exercises every option once, in every mode. Compiled by tests/test_latex.py
+% with pdflatex, lualatex and xelatex.
+\documentclass{article}
+\usepackage{pubviz}
+\newcommand\demo{%
+  \begin{pvtable}[delta=relative]{lcccc}
+  \toprule
+   & \multicolumn{2}{c}{Quality} & \multicolumn{2}{c}{Cost} \\
+  \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+  Method & Acc \pvup & F1 & Time (s) \pvdown & Mem $\downarrow$ \\
+  \midrule
+  \pvsection{Group one} \\
+  \pvbaseline Base & 70.1 & 0.61 & 12.4 & 3.1 \\[2pt]
+  \pvlabel{Prior}{with tuning} & 72.3\% & -- & 11.9 & 2.9 \\
+  \pvours Ours & $74.0 \pm 0.4$ & 0.66 & 10.2 & n/a \\
+  \pvnorank Oracle & 90.0 & 0.80 & 5.0 & 1.0 \\
+  Year & {2024} & 0.70 & 0 & 0.0 \\
+  \bottomrule
+  \end{pvtable}\pvkey\medskip}
+\begin{document}
+\pvsetup{debug=true}
+
+\demo
+\pvsetup{fill=cell, ranks=3, align=r}\demo
+\pvsetup{fill=none}\demo
+\pvsetup{fill=chip, mode=gray}\demo
+\pvsetup{mode=plain}\demo
+\pvsetup{mode=color, accent=teal!80!black, ties=dense, bold-best=false, underline-second=true}\demo
+\pvsetup{theme=purple, stretch=1}
+
+\begin{pvtable}[by=row, heat=group, label-cols=2, header=1]{llccc}
+  Task & Unit & A & B & C \\
+  Speed & tok/s & 10 & 20 & 30 \\
+  Error & \% \pvdown & 3.0 & 2.0 & 1.0 \\
+  Flat & x & 1 & 1 & 1 \\
+\end{pvtable}
+
+\begin{pvtable}[by=row, heat=table, delta=absolute, show=delta, ranks=0]{lccc}
+  \toprule
+  & \pvbaseline A & B & C \\
+  \midrule
+  x & 1.00 & 1.25 & 0.50 \\
+  y & 2.0 & 2.5 & 1.0 \\
+  \bottomrule
+\end{pvtable}
+
+% The marks also work in running text, as in a caption that explains them.
+\pvbest{Best} and \pvsecond{second best} in each column.
+
+\begin{tabular}{lcc}
+  \pvsectionrow{3}{Hand-made} \\
+  a & \pvbest{1.0} & \pvsecond{0.9} \\
+  b & \pvthird{0.8} & \pvna \\
+  c & \pvheat{0.5}{3.3} & 4.0\,\pvdelta{+0.3} \pvdelta[lower]{+0.3} \pvdelta{\textminus 0.1} \\
+\end{tabular}
+
+\pvsetup{accent=#3366CC, pos=0072B2, neg=D55E00, missing=n/a, delta-size=0.8, chip-hpad=2pt, chip-vpad=1pt, ours-style=\itshape}
+\begin{pvtable}{lc}
+  \toprule
+  M & S \\
+  \midrule
+  \pvours O & 1 \\
+  P & 2 \\
+  Q & - \\
+  \bottomrule
+\end{pvtable}
+% Heat per column, with a lower-is-better column.
+\begin{pvtable}[heat=group]{lcc}
+  \toprule
+  M & Acc & Err \pvdown \\
+  \midrule
+  a & 1.0 & 3.0 \\
+  b & 2.0 & 2.0 \\
+  c & 3.0 & 1.0 \\
+  \bottomrule
+\end{pvtable}
+
+% A pvtable inside another tabular cell.
+\begin{tabular}{c}
+  outer \\[2pt]
+  \begin{pvtable}{lc}
+    \toprule
+    M & A \\
+    \midrule
+    x & 1 \\
+    y & 2 \\
+    \bottomrule
+  \end{pvtable}
+\end{tabular}
+\end{document}

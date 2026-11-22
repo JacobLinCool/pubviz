@@ -1,0 +1,16 @@
+\documentclass{article}
+\usepackage{pubviz}
+\pvsetup{debug=true}
+\begin{document}
+\begin{pvtable}[ties=dense]{lcccc}
+\toprule
+Method & Acc & F1 & WER $\downarrow$ & Tie \\
+\midrule
+Base & 70.1 & 0.61 & 12.4 & 5.0 \\
+Prior A & 71.0 & 0.63 & 12.0 & 7.0 \\
+Prior B & 72.3 & 0.64 & 11.9 & 7.0 \\
+\pvours Ours & 74.0 & 0.66 & 10.2 & 6.0 \\
+\pvnorank Oracle & 90.0 & 0.80 & 5.0 & 9.0 \\
+\bottomrule
+\end{pvtable}
+\end{document}

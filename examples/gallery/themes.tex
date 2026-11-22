@@ -1,0 +1,22 @@
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage{pubviz}
+\newcommand\demo[1]{%
+  \begin{tabular}[t]{@{}c@{}}
+  \textsf{\footnotesize theme=#1}\\[4pt]
+  \pvsetup{theme=#1}%
+  \begin{pvtable}{lccc}
+    \toprule
+    Method & A & B & C \\
+    \midrule
+    Base & 61.0 & 40.2 & 30.5 \\
+    Prior & 66.2 & 52.4 & 38.2 \\
+    \pvours Ours & 68.3 & 58.3 & 37.9 \\
+    \bottomrule
+  \end{pvtable}
+  \end{tabular}}
+\begin{document}
+\small
+\demo{amber}\quad\demo{blue}\quad\demo{teal}\quad\demo{green}\quad\demo{red}\quad\demo{purple}
+\end{document}

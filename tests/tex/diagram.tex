@@ -1,0 +1,14 @@
+% The diagram styles in every mode, and the warning for a diagram wider than
+% its line. Compiled by tests/test_latex.py with pdflatex, lualatex, xelatex.
+\documentclass{article}
+\usepackage[diagrams]{pubviz}
+\input{../../examples/diagrams/transformer}
+\begin{document}
+\transformer
+\transformer[pv kinds=false, ffn/.append style={pv new}]
+\pvsetup{mode=gray}\transformer[ffn/.append style={pv new}]
+\pvsetup{mode=plain, diagram-font=body}\transformer[pv kinds=false, ffn/.append style={pv new}]
+
+% Too wide for a 2 in column: one warning, nothing scaled.
+\begin{minipage}{2in}\transformer\end{minipage}
+\end{document}

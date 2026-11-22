@@ -1,0 +1,26 @@
+% The key in Traditional Chinese: language=zh-tw sets every word, and
+% key/best still changes one. Compiled with XeLaTeX by tests/test_latex.py.
+\documentclass{article}
+\usepackage[debug, language=zh-tw]{pubviz}
+\begin{document}
+\begin{pvtable}[delta=absolute]{lccc}
+  \toprule
+  Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+  \midrule
+  \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+  Prior A & 72.3 & 11.9 & 0.35 \\
+  \pvours Ours & 74.0 & 10.2 & 0.28 \\
+  \bottomrule
+\end{pvtable}
+\pvkey
+\pvsetup{key/best={最好}}
+\begin{pvtable}[heat=table]{lcc}
+  \toprule
+  Size & 10B & 30B \\
+  \midrule
+  125M & 41.2 & 44.0 \\
+  1.3B & 48.1 & 53.9 \\
+  \bottomrule
+\end{pvtable}
+\pvkey
+\end{document}

@@ -1,0 +1,40 @@
+% Keys in other languages: Korean (words separated by spaces), Japanese
+% (no spaces, full-width punctuation) and a language defined in the document,
+% which takes English for the words it leaves out. Compiled with XeLaTeX by
+% tests/test_latex.py; the CJK glyphs need not be installed for the log.
+\documentclass{article}
+\usepackage[debug]{pubviz}
+\pvdefinelanguage{de}{best=Beste, second=Zweitbeste, each-column=in jeder Spalte,
+  small-numbers=Kleine Zahlen, against=Änderung gegenüber, baseline=der Basis,
+  better=besser, worse=schlechter, or=oder}
+% A quote in a word must survive the trip to the layout file's JSON.
+\pvsetup{language=ko, key/crosses-zero={0 "포함"}}
+\newcommand\changes{%
+  \begin{pvtable}[delta=absolute]{lccc}
+    \toprule
+    Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+    \midrule
+    \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+    Prior A & 72.3 & 11.9 & 0.35 \\
+    \pvours Ours & 74.0 & 10.2 & 0.28 \\
+    \bottomrule
+  \end{pvtable}}
+\begin{document}
+\changes
+\pvkey
+% The layout file records the settings in force when the first page ships out.
+\newpage
+\pvsetup{language=de}
+\changes
+\pvkey
+\pvsetup{language=ja}
+\begin{pvtable}[heat=table]{lcc}
+  \toprule
+  Size & 10B & 30B \\
+  \midrule
+  125M & 41.2 & 44.0 \\
+  1.3B & 48.1 & 53.9 \\
+  \bottomrule
+\end{pvtable}
+\pvkey
+\end{document}

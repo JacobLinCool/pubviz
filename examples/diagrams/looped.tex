@@ -1,0 +1,42 @@
+% A model whose middle blocks run several times with shared weights, drawn
+% in the light diagram style: thin grey links, stacks of layers as small
+% pictures, the repeated part in an accent region. Needs
+% \usepackage[diagrams]{pubviz}. \looped[<options>] draws it; the options go
+% to pvdiagram. It is drawn for the text width (a figure*).
+%
+% Each stage is placed relative to the one before, so changing a gap or a
+% label moves the rest with it.
+\newcommand\looped[1][]{%
+\begin{pvdiagram}[node distance=6mm and 9mm, #1]
+  % ---- the stage that runs once before the loop
+  \node[pv stack] (embed) {};
+  \node[pv title, above=2.5mm of embed] {Embedding\\\pvnote{runs once}};
+  % ---- the shared blocks, one row per step, in an accent region
+  \foreach \step/\below in {1/embed, 2/b1, 3/b2} {
+    \ifnum\step=1
+      \node[pv stack, pv emph, right=27mm of embed] (a\step) {};
+    \else
+      \node[pv stack, pv emph, below=11mm of a\the\numexpr\step-1\relax] (a\step) {};
+    \fi
+    \node[pv stack, pv emph, right=7mm of a\step] (b\step) {};
+    \draw[pv link, pv emph] (a\step) -- (b\step);
+    \begin{scope}[on background layer]
+      \node[pv region=pv-fill-3, fit=(a\step)(b\step), inner xsep=3mm, inner ysep=2.5mm] (r\step) {};
+    \end{scope}
+  }
+  \node[pv title, above=2.5mm of r1] {Shared blocks\\\pvnote{\pvrepeat\ run three times}};
+  % ---- the state each step hands to the next
+  \foreach \from/\to in {1/2, 2/3} {
+    \draw[pv link, pv emph] (r\from.south) -- node[pv note, right, text=pv-strong] {state} (r\to.north);
+  }
+  % ---- the input reaches every step along one branching line
+  % Each branch is drawn whole from the start, so its turn down is rounded.
+  \coordinate (bus) at ($(embed.east)+(7mm,0)$);
+  \draw[pv link] (embed.east) -- node[pv note, above, pos=0.78] {Step 1} (r1.west);
+  \draw[pv link] (embed.east) -- (bus) |- node[pv note, above, pos=0.8] {Step 2} (r2.west);
+  \draw[pv link] (embed.east) -- (bus) |- node[pv note, above, pos=0.8] {Step 3} (r3.west);
+  % ---- the stage that runs once after the loop
+  \node[pv stack, right=24mm of r3] (head) {};
+  \node[pv title, above=2.5mm of head] {Output head\\\pvnote{runs once}};
+  \draw[pv link] (r3.east) -- (head);
+\end{pvdiagram}}

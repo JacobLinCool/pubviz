@@ -1,0 +1,40 @@
+% A speech recognizer as a pipeline, left to right, in the light diagram
+% style: a small picture for each kind of data, stacks of layers for the
+% networks, a title and a grey note above each stage on one line, the new
+% encoder in the accent, and the path used only in training dashed. Needs
+% \usepackage[diagrams]{pubviz}. \asr[<options>] draws it; the options go to
+% pvdiagram. It is drawn for the text width (a figure*).
+\newcommand\asr[1][]{%
+\begin{pvdiagram}[node distance=6mm and 12mm,
+  stage/.style={minimum width=14mm, minimum height=11mm, inner sep=0pt},
+  #1]
+  % ---- what goes in: a waveform, then the features computed from it
+  \node[stage] (wave) {};
+  \draw[pv-line, line width=0.5pt, shift={(wave.center)}] plot[domain=-1:1, samples=90, smooth]
+    ({7mm*(\x)}, {4mm*sin(1100*(\x))*exp(-3*(\x)^2)});
+  \node[stage, right=of wave] (feat) {};
+  \foreach \c [count=\i from 0] in {20,45,70,40,15,35,60,80,50,25,10,30,55,65,45,20,
+                                    15,25,40,30,20,35,50,60,35,15,5,10,20,25,15,10} {
+    \pgfmathtruncatemacro\col{mod(\i,8)}
+    \pgfmathtruncatemacro\row{div(\i,8)}
+    \fill[pv-line!\c!white] ($(feat.south west)+(\col*1.75mm, 0.5mm+\row*2.5mm)$) rectangle ++(1.6mm, 2.35mm);
+  }
+  % ---- the networks: the new encoder in the accent
+  \node[pv stack, pv emph, right=of feat] (enc) {};
+  \node[pv stack, right=of enc] (dec) {};
+  % ---- what comes out
+  \node[stage, right=of dec] (text) {\itshape ``the cat sat''};
+  % ---- one line of titles above every stage
+  \coordinate (titles) at ($(enc.north)+(0,2.5mm)$);
+  \foreach \at/\title in {wave/{Speech\\\pvnote{16 kHz}}, feat/{Features\\\pvnote{80 mel bands}},
+                          enc/{\textbf{Encoder}\\\pvnote{new; 12 layers}}, dec/{Decoder\\\pvnote{6 layers}},
+                          text/{Text\\\pvnote{tokens}}}
+    \node[pv title, anchor=south] at (\at |- titles) {\title};
+  \draw[pv link] (wave) -- (feat);
+  \draw[pv link] (feat) -- (enc);
+  \draw[pv link, pv emph] (enc) -- node[pv note, above, text=pv-strong] {states} (dec);
+  \draw[pv link] (dec) -- (text);
+  % ---- a path taken only in training, dashed, below the main row
+  \draw[pv link, dashed] (text.south) -- ++(0,-6mm) -| node[pv note, below, pos=0.25]
+    {CTC loss, training only} (enc.south);
+\end{pvdiagram}}

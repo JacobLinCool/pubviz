@@ -1,0 +1,19 @@
+% Token shading with \pvshade: unsigned weights on the accent scale, signed
+% weights in pos and neg with negative words underlined, in color and grey.
+% The lines were written by pv.pvshade; rendered to docs/img/tokens.png.
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage{varwidth}
+\usepackage{pubviz}
+\newcommand\demo[1]{%
+  \begin{varwidth}{9cm}
+  \textsf{\footnotesize mode=#1\strut}\par\smallskip
+  \pvsetup{mode=#1}%
+  \pvshade{0.08}{the} \pvshade{1.00}{cat} \pvshade{0.48}{sat} \pvshade{0.13}{on} \pvshade{0.05}{the} \pvshade{0.73}{mat} \pvshade{0.03}{.}\par\smallskip
+  \pvshade*{0.02}{The} \pvshade*{0.11}{film} \pvshade*{0.03}{was} \pvshade*{-0.58}{not} \pvshade*{-0.84}{bad} \pvshade*{0.05}{at} \pvshade*{0.08}{all} \pvshade*{0.01}{,} \pvshade*{0.04}{the} \pvshade*{0.21}{acting} \pvshade*{0.06}{was} \pvshade*{1.00}{superb}
+  \end{varwidth}}
+\begin{document}
+\small
+\demo{color}\quad\demo{gray}
+\end{document}

@@ -1,0 +1,33 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage{pubviz}
+\pvsetup{debug=true}
+\begin{document}
+
+\begin{pvtable}[by=row]{l*{5}{c}}
+\toprule
+ & \pvours Ours & Model A & Model B & Model C & Model D \\
+\midrule
+\pvsection{Third-party index}\\
+AA Index & 20.1 & 4.4 & 6.3 & 20.1 & 13.6 \\
+Vals Index & 46.5\% & -- & -- & -- & 29.8\% \\
+\pvsection{Coding}\\
+\pvlabel{FrontierCode v2.0}{stirrup v0.2.1} & 15.1\% & 0.0\% & 1.5\% & 14.9\% & 6.1\% \\
+Latency (s) \pvdown & 1.20 & 0.90 & 2.10 & 1.50 & 0.95 \\
+PMPP-Hard & 455.82 & -- & -- & 262.50 & -- \\
+\bottomrule
+\end{pvtable}
+
+\bigskip
+\begin{pvtable}[delta=absolute]{lccc}
+\toprule
+Method & Acc $\uparrow$ & F1 & WER \pvdown \\
+\midrule
+\pvbaseline Base & 70.1 & 0.61 & 12.4 \\
+Prior & 72.3 & 0.64 & 11.9 \\
+\pvours Ours & $74.0 \pm 0.4$ & 0.66 & 10.2 \\
+\pvnorank Oracle & 90.0 & 0.80 & 5.0 \\
+\bottomrule
+\end{pvtable}
+\end{document}

@@ -1,0 +1,14 @@
+% The kinds that show what a model does: its errors, its weights, its
+% outputs as pictures or sound. Rendered to docs/img/figures-models.png.
+\documentclass[border=8pt]{standalone}
+\usepackage{graphicx}
+\newcommand\fig[1]{\includegraphics[width=3.487in]{../build/figs/ieee/#1.pdf}}
+\begin{document}
+\begin{tabular}{@{}c@{\hspace{16pt}}c@{}}
+\fig{confusion} & \fig{attention}\\[10pt]
+\fig{roc} & \fig{precision_recall}\\[10pt]
+\fig{det} & \fig{reliability}\\[10pt]
+\fig{images} & \fig{overlay}\\[10pt]
+\fig{spectrogram} & \fig{embedding}
+\end{tabular}
+\end{document}

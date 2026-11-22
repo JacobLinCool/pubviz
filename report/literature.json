@@ -1,0 +1,22 @@
+{
+ "_note": "Values quoted from the surveyed papers, each with the location it was read from. Nothing here is read off a chart.",
+ "pandey2015": {
+  "source": "Pandey et al. 2015, Tables 1-2 and Results (preprint, PDF p. 9)",
+  "measure": "five-point rating of how much better one quantity is than another; higher means the chart conveys a larger difference",
+  "conditions": {
+   "Truncated bar axis": {"control": [1.45, 1.27, 1.62], "distorted": [2.77, 2.26, 3.28], "test": "U = 1144, p = 0.0003, r = 0.37"},
+   "Stretched aspect ratio": {"control": [1.39, 1.23, 1.55], "distorted": [3.19, 2.76, 3.62], "test": "U = 1409, p < 0.0001, r = 0.66"},
+   "Value as bubble area": {"control": [1.71, 1.45, 1.98], "distorted": [2.71, 2.27, 3.15], "test": "U = 1121, p = 0.0007, r = 0.34"}
+  }
+ },
+ "belia2005": {
+  "source": "Belia et al. 2005, p. 393",
+  "measure": "p value implied by where respondents placed the second mean so the two means were 'just significantly different'; the correct placement gives p = .05",
+  "implied_p": {
+   "All": {"95% CI bars": 0.009, "SE bars": 0.109},
+   "Psychology": {"95% CI bars": 0.017, "SE bars": 0.158},
+   "Behav. neurosci.": {"95% CI bars": 0.008, "SE bars": 0.078},
+   "Medicine": {"95% CI bars": 0.006, "SE bars": 0.104}
+  }
+ }
+}

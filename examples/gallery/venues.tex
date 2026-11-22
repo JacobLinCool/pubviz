@@ -1,0 +1,13 @@
+\documentclass[border=8pt]{standalone}
+\usepackage{graphicx}
+\newcommand\page[2]{%
+  \begin{tabular}[t]{@{}c@{}}
+  \fbox{\includegraphics[page=2,width=3in]{../build/#1.pdf}}\\[3pt]
+  \sffamily\scriptsize #2
+  \end{tabular}}
+\begin{document}
+\page{ieee}{IEEEtran}\enspace
+\page{acm}{acmart sigconf}\enspace
+\page{lncs}{Springer LNCS}\enspace
+\page{elsevier}{elsarticle, mode=gray}
+\end{document}

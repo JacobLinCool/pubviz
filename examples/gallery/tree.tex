@@ -1,0 +1,14 @@
+% The decision tree of docs/decision-tree.md, one chart per page.
+% make gallery renders page n to docs/img/tree-n.png.
+\documentclass[border=8pt, multi=tikzpicture]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[diagrams]{pubviz}
+\input{tree-charts}
+\begin{document}
+\pvtreeStart
+\pvtreeTables
+\pvtreeAmounts
+\pvtreeRuns
+\pvtreeModel
+\end{document}

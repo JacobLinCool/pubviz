@@ -1,0 +1,45 @@
+% Retrieval-augmented generation in the light diagram style: a question, a
+% retriever that searches an index, the passages it finds, and a reader
+% that writes the answer from them and the question. The retrieval stage
+% sits in a neutral region, and the reader, the part this example takes as
+% new, is in the accent. Needs \usepackage[diagrams]{pubviz}; the index
+% is a cylinder from the TikZ library loaded here. \retrieval[<options>]
+% draws it; the options go to pvdiagram. It is drawn for the text width (a
+% figure*).
+\usetikzlibrary{shapes.geometric}
+\newcommand\retrieval[1][]{%
+\begin{pvdiagram}[node distance=6mm and 12mm,
+  stage/.style={minimum width=14mm, minimum height=11mm, inner sep=2pt, align=center},
+  doc/.style={draw=pv-line, fill=white, minimum width=6mm, minimum height=7.5mm, inner sep=0pt,
+    path picture={\foreach \y in {0.25,0.45,0.65}
+      \draw[pv-muted, line width=0.4pt] ($(path picture bounding box.south west)!\y!(path picture bounding box.north west)+(1.2mm,0)$)
+        -- ++(3.6mm,0);}},
+  #1]
+  \node[stage] (q) {Who wrote\\``Middlemarch''?};
+  % ---- retrieval: a retriever and the index it searches
+  \node[pv stack, pv layers=4, right=of q] (ret) {};
+  \node[cylinder, shape border rotate=90, aspect=0.25, draw=pv-line, fill=white,
+    minimum width=11mm, minimum height=9mm, below=8mm of ret] (index) {};
+  \node[pv note, anchor=west] at ($(index.east)+(1.5mm,0)$) {21M\\passages};
+  \draw[pv link] ([xshift=-1.5mm]ret.south) -- node[pv note, left] {search} ([xshift=-1.5mm]index.north);
+  \draw[pv link] ([xshift=1.5mm]index.north) -- ([xshift=1.5mm]ret.south);
+  % ---- the passages found, then the reader and its answer
+  \node[stage, right=of ret] (docs) {};
+  \node[doc] (d1) at ($(docs.center)+(-2mm,1.5mm)$) {};
+  \node[doc] (d2) at (docs.center) {};
+  \node[doc] (d3) at ($(docs.center)+(2mm,-1.5mm)$) {};
+  \node[pv stack, pv emph, right=22mm of docs] (read) {};
+  \node[stage, right=of read] (a) {George Eliot};
+  \begin{scope}[on background layer]
+    \node[pv region, fit=(ret)(index), inner xsep=7mm, inner ysep=3mm] {};
+  \end{scope}
+  % ---- one line of titles above every stage, aligned at the top
+  \coordinate (titles) at ($(ret.north)+(0,11mm)$);
+  \foreach \at/\title in {q/{Question}, ret/{Retriever\\\pvnote{dual encoder}}, docs/{Passages\\\pvnote{top 5}},
+                          read/{\textbf{Reader}\\\pvnote{new}}, a/{Answer}}
+    \node[pv title, anchor=north] at (\at |- titles) {\title};
+  \draw[pv link] (q) -- (ret);
+  \draw[pv link] (ret) -- (docs);
+  \draw[pv link] (docs) -- node[pv note, below] {and the question} (read);
+  \draw[pv link, pv emph] (read) -- (a);
+\end{pvdiagram}}

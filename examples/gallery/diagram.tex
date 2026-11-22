@@ -1,0 +1,17 @@
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[diagrams]{pubviz}
+\input{../diagrams/transformer}
+% #1 print mode, #2 options for the diagram, #3 caption under the panel.
+\newcommand\panel[3]{%
+  \begin{tabular}[b]{@{}c@{}}
+    \pvsetup{mode=#1}\transformer[#2]\\[6pt]
+    \textsf{\footnotesize #3}
+  \end{tabular}}
+\begin{document}
+\panel{color}{}{by kind}\hspace{18pt}%
+\panel{gray}{}{by kind, mode=gray}\hspace{18pt}%
+\panel{color}{pv kinds=false, ffn/.append style={pv new}}{by role (feed-forward as the new part)}\hspace{18pt}%
+\panel{gray}{pv kinds=false, ffn/.append style={pv new}}{by role, mode=gray}
+\end{document}

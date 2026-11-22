@@ -1,0 +1,118 @@
+% The five charts of the decision tree in docs/decision-tree.md. Input by
+% examples/gallery/tree.tex (docs images) and report/report.tex.
+% Needs \usepackage[diagrams]{pubviz}.
+\tikzset{
+  whole words/.style={execute at begin node={\hyphenpenalty=10000\exhyphenpenalty=10000}},
+  % A question; an exhibit and the pubviz call that draws it.
+  q/.style={pv block, text width=27mm, whole words},
+  ex/.style={pv block, pv fill=pv-band, text width=31mm, whole words},
+  % A pointer to another chart.
+  go/.style={pv label, text=pv-muted},
+  ans/.style={font=\sffamily\scriptsize, text=pv-ink, align=left, inner sep=1pt, whole words},
+}
+\newcommand\treecode[1]{{\ttfamily\scriptsize #1}}
+\newcommand\treenote[1]{\textcolor{pv-muted}{\scriptsize[#1]}}
+% \answer[label width]{question}{target}{answer}: an arrow from a question to
+% the next question or exhibit, with the answer written above it.
+\newcommand\answer[4][29mm]{%
+  \draw[pv flow] (#2.east) -- ++(3mm,0) |-
+    node[ans, text width=#1, pos=0.5, anchor=south west, xshift=1mm] {#4} (#3.west);}
+
+\newcommand\pvtreeStart{%
+\begin{tikzpicture}[pv diagram]
+  \node[q] (take) {What should the reader take away?};
+  \node[ex, right=34mm of take, yshift=48mm] (dia) {Diagram \treenote{1}\\\treecode{pvdiagram}};
+  \node[ex, right=34mm of take, yshift=34mm] (tab) {Table \treenote{2}\\\treecode{pvtable}; chart 2};
+  \node[q, right=34mm of take, yshift=-12mm] (num) {What is each number?};
+  \node[go, right=34mm of take, yshift=-58mm] (model) {chart 5};
+  \answer{take}{dia}{how the method works}
+  \answer{take}{tab}{exact values, or many measures per method}
+  \answer[32mm]{take}{num}{a shape or a comparison}
+  \answer{take}{model}{what the model does with its inputs}
+  \node[go, right=34mm of num, yshift=30mm] (amt) {chart 3};
+  \node[go, right=34mm of num, yshift=18mm] (runs) {chart 4};
+  \node[ex, right=34mm of num, yshift=5mm] (rate) {Diverging stacked bars \treenote{3}\\\treecode{pv.ratings}};
+  \node[ex, right=34mm of num, yshift=-9mm] (curve) {Lines named at their ends; panels if many \treenote{4}\\\treecode{pv.curves}};
+  \node[ex, right=34mm of num, yshift=-24mm] (scale) {Log axes and a fitted power law \treenote{5}\\\treecode{pv.scaling}};
+  \node[ex, right=34mm of num, yshift=-38mm] (trade) {Points and their frontier \treenote{6}\\\treecode{pv.tradeoff}};
+  \answer{num}{amt}{one measured amount: a count, a share, one run}
+  \answer{num}{runs}{an estimate from repeated runs: seeds, people, test items}
+  \answer{num}{rate}{answers on an ordered rating scale}
+  \answer{num}{curve}{a series over steps or time}
+  \answer{num}{scale}{a measure against model size, data or compute}
+  \answer{num}{trade}{two measures that pull against each other}
+\end{tikzpicture}}
+\newcommand\pvtreeTables{%
+\begin{tikzpicture}[pv diagram]
+  \node[q] (base) {Is the claim a change from one baseline?};
+  \node[ex, right=18mm of base, yshift=9mm] (delta) {Signed changes beside the values \treenote{7}\\\treecode{delta=absolute}};
+  \node[q, right=18mm of base, yshift=-11mm] (grid) {Does the pattern across cells matter more than the best one?};
+  \answer[12mm]{base}{delta}{yes}
+  \answer[12mm]{base}{grid}{no}
+  \node[ex, right=18mm of grid, yshift=8mm] (heat) {Shading by value \treenote{8}\\\treecode{heat=group}};
+  \node[ex, right=18mm of grid, yshift=-8mm] (rank) {Best and second marked, with a key \treenote{9}\\\treecode{ranks=2}, \treecode{\textbackslash pvkey}};
+  \answer[12mm]{grid}{heat}{yes}
+  \answer[12mm]{grid}{rank}{no}
+\end{tikzpicture}}
+\newcommand\pvtreeAmounts{%
+\begin{tikzpicture}[pv diagram]
+  \node[q] (small) {Are the differences small next to the values?};
+  \node[ex, right=34mm of small, yshift=30mm] (diff) {The differences themselves \treenote{10}\\\treecode{pv.deltas}};
+  \node[q, right=34mm of small, yshift=-20mm] (fac) {How many factors?};
+  \answer{small}{diff}{yes: bars from zero would hide them}
+  \answer{small}{fac}{no}
+  \node[ex, right=34mm of fac, yshift=26mm] (bars) {Bars from zero \treenote{11}\\\treecode{pv.bars}};
+  \node[ex, right=34mm of fac, yshift=12mm] (ranked) {A dot per item, sorted; not a radar chart \treenote{12}\\\treecode{pv.ranked}};
+  \node[ex, right=34mm of fac, yshift=-3mm] (heatmap) {Heatmap \treenote{13}\\\treecode{pv.heatmap}};
+  \node[ex, right=34mm of fac, yshift=-16mm] (group) {Grouped bars from zero \treenote{11}\\\treecode{pv.bars}};
+  \node[go, right=34mm of fac, yshift=-28mm] (table) {a table: chart 2};
+  \answer{fac}{bars}{one, a few items}
+  \answer{fac}{ranked}{one, many items: languages, classes}
+  \answer{fac}{heatmap}{two, both ordered: sizes, rates, steps}
+  \answer{fac}{group}{two kinds, a few of each}
+  \answer{fac}{table}{two kinds, many of each}
+\end{tikzpicture}}
+\newcommand\pvtreeRuns{%
+\begin{tikzpicture}[pv diagram]
+  \node[q] (claim) {What is the claim about?};
+  \node[q, right=34mm of claim, yshift=23mm] (pair) {Did each method run on the same seeds or items?};
+  \node[ex, right=34mm of claim, yshift=-2mm] (level) {Point and interval, or a gradient of the mean \treenote{15}\\\treecode{pv.means}};
+  \node[q, right=34mm of claim, yshift=-25mm] (n) {How many runs per group?};
+  \answer{claim}{pair}{a difference between methods}
+  \answer{claim}{level}{the level of each method}
+  \answer{claim}{n}{how the runs spread}
+  \node[ex, right=34mm of pair, yshift=9mm] (paired) {The change per run, with its interval \treenote{14}\\\treecode{pv.deltas}, \treecode{pv.mean\_ci}};
+  \node[ex, right=34mm of pair, yshift=-10mm] (indep) {The difference, with an interval for two groups \treenote{14}\\\treecode{pv.deltas}};
+  \answer{pair}{paired}{yes: paired}
+  \answer{pair}{indep}{no: independent}
+  \node[ex, right=34mm of n, yshift=9mm] (dots) {Every run as a dot, the mean marked \treenote{16}\\\treecode{pv.dots}};
+  \node[ex, right=34mm of n, yshift=-10mm] (box) {Box, strip, violin or histogram, by what is judged \treenote{17}\\\treecode{pv.distributions}};
+  \answer{n}{dots}{a handful, under ten}
+  \answer{n}{box}{many}
+\end{tikzpicture}}
+\newcommand\pvtreeModel{%
+\begin{tikzpicture}[pv diagram]
+  \node[q] (see) {What should the reader see of the model?};
+  \node[ex, right=34mm of see, yshift=44mm] (conf) {Confusion matrix, rows as shares \treenote{18}\\\treecode{pv.confusion}};
+  \node[ex, right=34mm of see, yshift=28mm] (roc) {ROC; with PR when positives are rare; DET for verification \treenote{19}\\\treecode{pv.roc}, \treecode{pv.det}};
+  \node[ex, right=34mm of see, yshift=12mm] (rel) {Reliability diagram with cases per bin \treenote{20}\\\treecode{pv.reliability}};
+  \node[q, right=34mm of see, yshift=-20mm] (out) {What are they?};
+  \node[q, right=34mm of see, yshift=-44mm] (wt) {Weights over what?};
+  \node[ex, right=34mm of see, yshift=-3mm] (emb) {A map of points, classes named on it \treenote{21}\\\treecode{pv.embedding}};
+  \answer{see}{conf}{which classes it mixes up}
+  \answer{see}{roc}{its errors at every threshold}
+  \answer{see}{rel}{whether its probabilities can be trusted}
+  \answer{see}{emb}{where it places its inputs}
+  \answer{see}{out}{its outputs}
+  \answer{see}{wt}{what its outputs rest on}
+  \node[ex, right=18mm of out, yshift=6mm] (img) {Image grid, one region enlarged \treenote{22}\\\treecode{pv.images}};
+  \node[ex, right=18mm of out, yshift=-7mm] (spec) {Spectrogram in dB, pitch on top \treenote{23}\\\treecode{pv.spectrogram}};
+  \answer[12mm]{out}{img}{images}
+  \answer[12mm]{out}{spec}{sounds}
+  \node[ex, right=18mm of wt, yshift=1mm] (att) {Weights matrix \treenote{24}\\\treecode{pv.attention}};
+  \node[ex, right=18mm of wt, yshift=-11mm] (ovl) {Map over the image in grey \treenote{25}\\\treecode{pv.overlay}};
+  \node[ex, right=18mm of wt, yshift=-23mm] (tok) {Shaded words \treenote{26}\\\treecode{\textbackslash pvshade}};
+  \answer[12mm]{wt}{att}{another sequence}
+  \answer[12mm]{wt}{ovl}{an image}
+  \answer[12mm]{wt}{tok}{the words of a text}
+\end{tikzpicture}}

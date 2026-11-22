@@ -1,0 +1,15 @@
+% The diagrams in the light style, one per page: make gallery renders page n
+% to docs/img/diagrams-n.png. The last page is the first diagram in grey.
+\documentclass[border=8pt, multi=pvdiagram]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage[diagrams]{pubviz}
+\input{../diagrams/looped}
+\input{../diagrams/asr}
+\input{../diagrams/retrieval}
+\begin{document}
+\looped
+\asr
+\retrieval
+\pvsetup{mode=gray}\looped
+\end{document}

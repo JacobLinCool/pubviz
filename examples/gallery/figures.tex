@@ -1,0 +1,14 @@
+\documentclass[border=8pt]{standalone}
+\usepackage{graphicx}
+\newcommand\fig[1]{\includegraphics[width=3.487in]{../build/figs/ieee/#1.pdf}}
+\begin{document}
+\begin{tabular}{@{}c@{\hspace{16pt}}c@{}}
+\multicolumn{2}{@{}c@{}}{\includegraphics[width=7.14in]{../build/figs/ieee/bars.pdf}}\\[10pt]
+\fig{curves} & \fig{tradeoff}\\[10pt]
+\fig{deltas} & \fig{heatmap}\\[10pt]
+\fig{dots} & \fig{means}\\[10pt]
+\fig{distributions} & \fig{distributions-violin}\\[10pt]
+\fig{ranked} & \fig{scaling}\\[10pt]
+\fig{ratings} & \fig{ratings-preference}
+\end{tabular}
+\end{document}

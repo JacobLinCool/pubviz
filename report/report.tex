@@ -1,0 +1,1167 @@
+% The pubviz technical report. Build: make report (from the repository root).
+% Every table, figure and diagram is made with pubviz; every number in them
+% comes from report/literature.json (values quoted from papers, with their
+% locations) or report/data.json (computed by report/analysis.py).
+\documentclass[11pt]{article}
+\usepackage[letterpaper, margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext, newtxmath}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[round, authoryear]{natbib}
+\usepackage[labelfont=bf, font=small]{caption}
+\usepackage{subcaption}
+\usepackage[section]{placeins}
+\usepackage[hidelinks]{hyperref}
+% Let a page hold more floats, so a section's exhibits stay near its text.
+\renewcommand\topfraction{0.9}
+\renewcommand\bottomfraction{0.8}
+\renewcommand\textfraction{0.07}
+\renewcommand\floatpagefraction{0.75}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\usepackage{xurl}
+\usepackage[diagrams]{pubviz}
+\input{../examples/gallery/tree-charts}
+\input{../examples/diagrams/transformer}
+\input{../examples/diagrams/looped}
+\input{../examples/diagrams/asr}
+\input{../examples/diagrams/retrieval}
+
+\newcommand\build{../examples/build/report}
+\newcommand\fig[2][\linewidth]{\IfFileExists{\build/#2.pdf}
+  {\includegraphics[width=#1]{\build/#2}}{\fbox{figure \detokenize{#2}}}}
+\newcommand\gen[1]{\IfFileExists{\build/#1.tex}{\input{\build/#1.tex}}{\fbox{table #1}}}
+\newcommand\code[1]{\texttt{#1}}
+
+\title{\textbf{pubviz}: Choosing and Drawing the Tables, Figures\\and Diagrams of a Research Paper}
+\author{Jhen-Ke Lin\\National Yang Ming Chiao Tung University\\\texttt{jacob.cs14@nycu.edu.tw}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Most conferences and journals provide a paper template. These templates set
+the page layout but say little about how results should be shown, so each
+paper decides on its own which exhibit to use and how to mark, color and size
+it. Many studies have measured how readers take in charts, tables and
+diagrams, but their findings reach the tools researchers use slowly. We
+present pubviz, an open library that brings these findings into a paper in
+two steps. A decision tree chooses the exhibit from what the numbers are and
+what the reader should take away, for a model's results as well as for what
+it does with its inputs, and ties each answer to the study behind it. A LaTeX package and a Python library then draw the chosen table, figure
+or diagram with defaults based on these findings: compared values on one
+scale, the uncertainty of an estimate shown over the runs themselves,
+colormaps ordered in lightness, fills that survive a grey print, and figures
+sized from the paper's own layout. Every exhibit takes its colors from one
+accent and keeps its meaning in grey and without color, and its words follow
+the paper's language. Where we found no study, as for how a table should mark
+its best value, we say so and mark the choice as our judgment. Every exhibit
+in this report is made with pubviz.
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+
+Most conferences and journals provide a paper template. The template fixes
+the page: margins, columns, fonts and the style of captions. It says almost
+nothing about the results on that page: whether a comparison should be a
+table or a figure, how a table points out its best number, how a figure sets
+the proposed method apart, or what its colors become on a grey printer. Each
+paper settles these questions on its own.
+
+The questions are not new to research. Experiments have measured how readers
+judge positions, lengths and angles
+\citep{cleveland1984graphical,heer2010crowdsourcing}, how they read error bars
+and intervals \citep{belia2005researchers,correll2014error,hofman2020visualizing},
+and how colormaps and palettes help or mislead them
+\citep{liu2018rainbow,szafir2018modeling,schloss2019mapping}. New results
+reach practical tools slowly, as \citet[Sec.~1]{moritz2019draco} note for
+visualization tools in general, and a researcher writing a paper meets them,
+if at all, as scattered rules of thumb.
+
+Papers in machine learning also show what a model does, not only how well it
+scores: the classes it confuses, the images or sounds it produces, the
+weights it places on its inputs. Guidance on charts mostly covers plots of
+values, yet in two large counts of computer science papers the largest share
+of figures fell outside the plot and diagram types that were counted
+\citep[Table~1]{siegel2016figureseer}\citep[Sec.~3]{hsu2021scicap}. For these
+exhibits, studies with readers are fewer still, and much of what is known
+comes from methodological arguments and from studies in other fields.
+
+We present pubviz, an open library that brings these findings into a paper
+in two steps (Figure~\ref{fig:overview}). The first step chooses the exhibit.
+A decision tree asks what the reader should take away, what each number is,
+how many factors it varies over and how many values there are; each answer
+leads to the next question or to a table, figure or diagram of a named kind.
+Every answer is tied to the study it rests on, or marked as our judgment
+where we found none. The second step draws the chosen exhibit. A LaTeX
+package marks result tables and draws method diagrams inside the paper, and
+a Python library draws the figures. Both take their defaults from the same
+findings and their colors from one accent color, and the LaTeX side passes
+the page's measurements to the figures through a layout file.
+
+\begin{figure}[tb]
+  \centering
+  \begin{pvdiagram}[node distance=5mm and 9mm]
+    \node[pv label] (claim) {A claim\\and its data};
+    \node[pv block, right=of claim, minimum width=31mm] (tree) {Choose the exhibit\\decision tree, \S\ref{sec:tree}};
+    \node[pv block, right=12mm of tree, yshift=8mm, minimum width=35mm] (tex) {Tables and diagrams\\LaTeX package};
+    \node[pv block, right=12mm of tree, yshift=-8mm, minimum width=35mm] (py) {Figures\\Python library};
+    \node[pv label, right=12mm of tex, yshift=-8mm] (page) {The printed\\page};
+    \begin{scope}[on background layer]
+      \node[pv group, fit=(tree)(tex)(py), inner sep=3mm,
+        label={[pv note]above:pubviz}] {};
+    \end{scope}
+    \draw[pv flow] (claim) -- (tree);
+    \draw[pv flow] (tree.east) -- ++(4mm,0) |- (tex.west);
+    \draw[pv flow] (tree.east) -- ++(4mm,0) |- (py.west);
+    \draw[pv flow] (tex.east) -- ++(4mm,0) |- (page.west);
+    \draw[pv flow] (py.east) -- ++(4mm,0) |- (page.west);
+    \draw[pv flow] (tex.south) -- node[pv note, left, align=right] {layout file: widths,\\fonts, colors, words} (py.north);
+  \end{pvdiagram}
+  \caption{\textbf{pubviz first chooses the table, figure or diagram,
+    then draws it.} The decision tree (Section~\ref{sec:tree}) picks a
+    table, figure or diagram; the LaTeX package and the Python library draw
+    it (Sections~\ref{sec:design} and~\ref{sec:catalog}). Each compile of the
+    paper writes a layout file that sizes and colors the figures.}
+  \label{fig:overview}
+\end{figure}
+
+This report makes four contributions:
+\begin{itemize}
+  \item A decision tree for the exhibits of a research paper, from result
+    tables to the exhibits that show what a model does, in which each
+    answer points to the place in a study that supports it, or is marked as
+    our judgment (Section~\ref{sec:tree}).
+  \item A LaTeX package that marks result tables from their numbers when the
+    paper compiles, with ranks, changes against a baseline, shading and a key
+    that explains each mark; and a Python library that sizes and colors
+    figures from a layout file the paper itself writes
+    (Sections~\ref{sec:design} and~\ref{sec:catalog}).
+  \item Defaults for color, uncertainty and print based on these findings,
+    with three checks of our own for color choices the studies leave open
+    (Sections~\ref{sec:design} and~\ref{sec:checks}).
+  \item An account of what remains untested, above all how a table should
+    mark its best value (Section~\ref{sec:limits}).
+\end{itemize}
+Every table, figure and diagram in this report is made with pubviz, and
+every number in them is computed from data files in its repository.
+
+\section{Related work}\label{sec:related}
+
+\paragraph{Choosing an exhibit automatically.} Automatic presentation began
+with APT \citep{mackinlay1986apt}, which picks an encoding from the types of
+the data and ranks the candidates by the accuracy ordering of
+\citet{cleveland1984graphical}. APT already designs differently for a color
+and a monochrome medium \citep[Sec.~9]{mackinlay1986apt}, but its ranking for
+ordinal and nominal data is, in its own words, conjectural and not
+empirically verified \citep[p.~124]{mackinlay1986apt}. Show Me brings
+automatic presentation into Tableau with rules taken from design books and
+leaves the user's task out on purpose \citep[Sec.~1]{mackinlay2007showme}.
+Voyager and its query engine CompassQL rank encodings with hand-tuned weights
+after Cleveland and Mackinlay
+\citep{wongsuphasawat2016voyager,wongsuphasawat2016compassql}. Draco is the
+first to take a task as input and to learn its weights from perception
+experiments; its authors limit the gain to the design space those
+experiments covered \citep[Sec.~6.3]{moritz2019draco}. VizML learns from the
+charts that Plotly users made \citep{hu2019vizml}. All five serve analysis on
+a screen. None handles result tables, the uncertainty of an estimate, a grey
+print or the size of a venue's column, and none asks what claim the exhibit
+makes.
+
+\paragraph{Guides for choosing a chart.} Several guides organize the choice
+for people rather than programs. From Data to Viz is a decision tree by the
+format of the data and cites no studies \citep{holtz2018datatoviz}.
+\citet{wilke2019fundamentals} organizes a book by the kind of quantity shown
+and cites studies mainly for uncertainty and color vision deficiency;
+\citet{rougier2014tenrules} and \citet{midway2020principles} give ten rules
+each, resting mostly on experience. The tree in Section~\ref{sec:tree} differs
+in two ways: it branches on the claim as well as on the data, and it covers
+tables, which these guides mostly leave aside; Wilke gives rules for the
+layout of a table but none for marking its best value
+\citep[Sec.~22.3]{wilke2019fundamentals}.
+
+\paragraph{What papers show and report.} Counts of figures in computer
+science papers find x--y plots the most common single type, about a fifth of
+the figures in two large samples, with bar charts and scatterplots far behind
+\citep[Table~1]{siegel2016figureseer}\citep[Sec.~3.1]{hsu2021scicap}; in the
+ACL Anthology, tables outnumber figures \citep[Sec.~4.2]{karishma2023aclfig}.
+Surveys of reporting practice find gaps that an exhibit and its caption can
+close. Almost half of the natural language generation papers in one survey
+did not give the number of people in a human evaluation
+\citep[p.~357]{vanderlee2019best}, and most evaluations in another did not
+show the prompt their evaluators saw \citep[Sec.~3.2.2]{howcroft2020twenty}. In
+speech synthesis, most papers used fewer than 20 listeners
+\citep[Table~1]{wester2015are} and most did not state the labels of the
+rating scale \citep[Table~3]{kirkland2023stuck}. Few papers on generated text
+show failures among their examples \citep[Table~1]{gehrmann2023repairing}, and
+precision--recall curves were rare even in studies of unbalanced data
+\citep[Table~4]{saito2015precision}.
+
+\paragraph{Tools for paper exhibits.} Plotting libraries such as matplotlib
+\citep{hunter2007matplotlib} leave the size of a figure to the user.
+SciencePlots and tueplots \citep{garrett_scienceplots,kramer_tueplots} ship
+styles with the widths and fonts of named venues written into their code;
+matplotlib-latex-bridge compiles a sample document of a class to measure
+them \citep{vannucci_mlb}; and pgfplots draws inside the document, so its
+figures take the document's width and fonts by construction
+\citep{feuersaenger2026pgfplots}. The closest precedent for the layout file of
+pubviz is a worked example in hybrid-latex, in which LaTeX writes a
+figure's width and height to a JSON file that Python reads
+\citep{brewin2018hybridlatex}. For tables, booktabs, siunitx and colortbl set
+rules, align numbers and fill cells
+\citep{fear2020booktabs,wright2026siunitx,carlisle2026colortbl}, but the
+author decides which cell to mark. pandas can bold or shade the best cell
+when it writes a table out as LaTeX \citep{pandas_styler_to_latex}, outside
+the paper and without a key, and xcolor can turn every color of a document to
+grey to preview a black-and-white print \citep{kern2024xcolor}. Among the
+items we read, we found no tool that ranks and marks a table when the paper
+compiles and explains the marks in a key, none that sizes figures from a
+layout written by the paper's own compilation, and none that shares one color
+theme across tables, figures and diagrams. These are statements about the
+items we read, not a proof that nothing else exists.
+
+\section{Choosing an exhibit}\label{sec:tree}
+
+The decision tree asks its questions in five flowcharts
+(Figures~\ref{fig:tree-start}--\ref{fig:tree-model}); the last is for what
+a model does with its inputs. A white box is a
+question and the words on an arrow are one answer to it; a grey box is an
+exhibit, with the pubviz call that draws it and the number of the note in
+the repository's \code{docs/decision-tree.md} that gives its evidence. This
+section summarizes that evidence. We keep apart three kinds of support:
+studies with readers, cited with the place where the finding is; our own
+computations, reported in Section~\ref{sec:checks}; and our judgment, where
+we found neither. Table~\ref{tab:status} sorts the answers by that support.
+
+\subsection{Where to start}
+
+\begin{figure}[tb]
+  \centering
+  \pvtreeStart
+  \caption{\textbf{The first questions separate a method from its results,
+    and lookup from shape.} Chart 1 of the decision tree. Charts 2 to 5
+    continue the branches marked there.}
+  \label{fig:tree-start}
+\end{figure}
+
+A diagram is for how the method works. It helps when it puts information
+used together in one place, so a reader finds it by location instead of by
+label, and an arbitrary diagram earns none of this
+\citep[pp.~98--99]{larkin1987diagram}. Arrows read as process: with arrows,
+people described more of how a device works and less of its parts, and
+people who drew a device after reading about its function added arrows far
+more often \citep[pp.~584--588]{heiser2006arrows}. Of five layout properties
+of a node-link diagram, only edge crossings affected both errors and
+response time \citep[Sec.~3.1]{purchase1997aesthetic}.
+
+For results, the first question is whether readers will look up exact values
+or need the shape. On the same data and tasks, a table was among the most
+accurate and fastest forms for looking up a single value and the least
+accurate for judging whether two measures are correlated
+\citep[Table~1]{saket2019task}. For spotting main effects and interactions in
+two-by-two results, line graphs were faster than tables but not more accurate
+\citep[pp.~7, 11]{braithwaite2013flexibility}. The older argument between
+Ehrenberg, who held that graphs are of little use for quantitative detail
+\citep[pp.~281--286]{ehrenberg1977rudiments}, and Gelman et al., who found
+that all but 4 of the 64 tables in one journal issue could have been graphs
+\citep[Fig.~8]{gelman2002practice}, rests on worked examples rather than
+readers. We read the experiments as a
+division of labor: a table when exact values or many measures matter, a
+figure when the shape does. Past about six methods or six groups we send the
+result to a table; that limit is our judgment.
+
+A series over steps or time goes on one axis with each line named at
+its end. Readers judge values most accurately as positions on a common scale
+\citep[p.~536]{cleveland1984graphical}, and they take lines as trends: in one
+study they described all 36 line graphs as trends and 28 of 33 bar graphs as
+comparisons between separate values \citep[Table~1]{zacks1999bars}. Overlaid
+lines were fastest when readers compared series at the same point of the
+x axis, and side-by-side panels when the compared points lay far apart, with
+no difference in correctness \citep[Sec.~7, Fig.~11]{javed2010graphical}. In
+an informal follow-up with four people, the two layouts took about the same
+time with two to four series and pulled apart from about eight
+\citep[Fig.~12]{javed2010graphical}; we switch to panels there, a judgment
+resting on that small test.
+
+Two measures that pull against each other, such as quality and cost, become
+one point per method with a line through the methods that no other method
+beats on both. We found no study of displays for such trade-offs; the nearest
+result is that scatterplots helped readers judge correlation in small
+datasets \citep[Table~1]{saket2019task}. Two scales in one plot area misled:
+when two scales of the same variable shared a plot, readers were least
+accurate and slowest, and all but one ranked that chart lowest
+\citep[Secs.~5--6]{isenberg2011study}. Readers of dual-axis line charts
+described the two series as correlated far more often than readers of
+connected scatterplots \citep[Sec.~3.3]{haroz2016connected}, although the
+crossings of the two lines mean nothing unless the axes share units and
+scale \citep[Sec.~2.2]{haroz2016connected}. pubviz therefore keeps one axis
+per measure; no study has tested twin y axes for two different measures.
+
+A measure against model size, data or compute goes on logarithmic axes with
+a fitted power law. Log axes carry a cost: ecologists read log--log graphs
+correctly far less often than linear ones \citep[abstract]{menge2018logarithmic},
+and a general sample misjudged growth on a log axis
+\citep[Table~7]{romano2020scale}. Readers who fit a trend by eye make it too
+steep \citep[Sec.~3.2.2]{ciccione2021can}, so the fitted line is drawn rather
+than left to the eye. Which points a fit used is the other risk: scaling-law
+papers extend their fits far past the data with little or no change of style
+\citep[Fig.~15]{kaplan2020scaling}\citep[Figs.~1--3]{hoffmann2022training}.
+pubviz draws the fit solid over the points it used and dashed beyond, and
+draws held-out points hollow, much as the GPT-4 report gives its held-out
+point a color of its own \citep[Fig.~1]{openai2023gpt4}; no study has tested
+these marks.
+
+Answers on a rating scale, such as a quality score or a preference between
+two systems, are ordered categories, and the tree draws how they spread
+rather than their mean alone. Analyzing such answers as numbers produced
+false alarms, misses and reversed orders in simulation
+\citep[Figs.~2--4]{liddell2018analyzing}, yet all 68 psychology articles that
+Liddell and Kruschke checked did so \citep[pp.~4--5]{liddell2018analyzing}.
+pubviz draws diverging stacked bars, the layout
+\citet[p.~6]{heiberger2014design} argue for because the shares on each side
+of the scale then start from one line. No reader study has compared it with
+other layouts; the nearest experiment, on stock data, found it no faster than
+ordinary stacked bars, though rated easier \citep[Secs.~5.1, 5.3]{indratmo2018efficacy}.
+When a paper reports a mean opinion score, ITU-T P.800.2 asks for the number
+of votes and the standard deviation beside it and warns against comparing
+scores across tests \citep[cls.~8, 10]{itu2016p8002}: one system's score fell
+by up to 1.28 points when it was retested among a narrower range of systems,
+in which it ranked last \citep[Sec.~4.4]{cooper2023investigating}. In win / tie / loss judgments the
+ties are set aside, a choice we found no study of.
+
+\subsection{Tables}
+
+\begin{figure}[tb]
+  \centering
+  \pvtreeTables
+  \caption{\textbf{A table's marks follow its claim.} Chart 2 of the
+    decision tree.}
+  \label{fig:tree-tables}
+\end{figure}
+
+A table whose claim is a change from a baseline prints the signed change
+beside each value, so the reader need not subtract; this follows the argument
+of \citet[Sec.~2]{gleicher2011visual} for drawing a relationship directly,
+which they argue rather than measure. A table whose point is a pattern across
+its cells shades each cell by its value. On a white page, darker is read as
+more, and a mapping that runs the other way costs time even with a legend in
+view \citep[Sec.~3]{schloss2019mapping}. pubviz shades better values darker
+in every column, so in a column where lower is better the darker cells hold
+the smaller numbers; the key states the direction, and whether that is
+enough is untested.
+
+Otherwise the table marks its best and second values and explains the marks
+in a key. No study we found tested marks in table cells. On text, bold, a
+yellow background and red text helped readers find highlighted words about
+equally well, and bold with a background is a pair the authors recommend
+because the two barely interfere \citep[Fig.~3, Secs.~6.3, 8.1]{strobelt2016guidelines};
+in a word search, bold was found faster than red text
+\citep[Tables~2--3]{doi2023highlighting}. Show Me leaves its color-filled
+tables unranked because a fill can make the text hard to read
+\citep[Sec.~5.2]{mackinlay2007showme}; the pubviz fills keep black text
+well above that risk (Section~\ref{sec:checks}). The key is our inference:
+unexplained marks are common and misread, as 22 of 46 visualization papers
+did not say what their error bars were \citep[Sec.~2.3]{correll2014error} and
+researchers misread both kinds of error bar \citep[p.~393]{belia2005researchers}.
+
+\subsection{One measured amount per item}
+
+\begin{figure}[tb]
+  \centering
+  \pvtreeAmounts
+  \caption{\textbf{A number measured once is a bar from zero, unless its
+    differences are what matters or the items are many.} Chart 3 of the
+    decision tree, for counts, shares and scores from a single run.}
+  \label{fig:tree-amounts}
+\end{figure}
+
+A number measured once, such as a count, a share or a score from a single run
+on a fixed test set, is drawn as a bar from zero. Bars are designed for
+categories \citep[p.~1]{weissgerber2015beyond}, and their length is their
+value, so the axis must start at zero: cutting a bar axis, stretching a line
+chart or drawing values as bubble areas each made readers rate the same
+difference as larger (Figure~\ref{fig:pandey}), and a broken-axis mark did
+not remove the effect \citep[pp.~6, 8]{correll2020truncating}. When the
+differences are small next to the values, as between scores near 90, bars
+from zero hide them; the way out is to draw the differences themselves, the
+third strategy of \citet[Sec.~2]{gleicher2011visual}. When both factors are
+ordered, as model size by data size, the grid reads as a surface and becomes
+a heatmap whose colormap keeps its lightness in order
+(Section~\ref{sec:checks}).
+
+When the one factor has many items, such as the languages of a multilingual
+test or the classes of a detector, bars crowd and papers often turn to radar
+charts. Readers were slower on radial versions of common graphs than on
+linear ones \citep[abstract]{goldberg2011eyetracking} and recalled positions
+in radial grids less accurately than in rectangular ones
+\citep[Sec.~4.2]{diehl2010radial}; among radial designs the radar chart did
+worst \citep[abstract]{albo2016radar}, and a review of glyph studies found
+linear designs ahead in most comparisons \citep[Sec.~4.6.4]{fuchs2017glyphs}.
+pubviz draws a dot chart instead, the form \citet{cleveland1984methods}
+proposed to replace bar charts, with the rows sorted by the paper's own
+method; the sorting and the marker per system are our judgment.
+
+\begin{figure}[tb]
+  \centering
+  \fig{pandey}
+  \caption{\textbf{Each distortion made the same difference look larger.}
+    Change in the mean rating of how much better one quantity was than
+    another (five-point scale), distorted chart minus control, from
+    \citet[Tables~1--2]{pandey2015deceptive}. Lines: approximate 95\%
+    intervals of the change, which we derived from the two reported intervals
+    assuming independent groups \citep{cumming2005inference}. Each distortion
+    had its own control, so the rows are not meant to be compared with each
+    other. Worse: the chart overstated the difference.}
+  \label{fig:pandey}
+\end{figure}
+
+\subsection{An estimate from repeated runs}
+
+\begin{figure}[tb]
+  \centering
+  \pvtreeRuns
+  \caption{\textbf{For an estimate from repeated runs, the claim decides
+    between the difference, the level and the spread.} Chart 4 of the
+    decision tree.}
+  \label{fig:tree-runs}
+\end{figure}
+
+Many results in machine learning are means over seeds, and for these the
+tree asks what the claim is about. When it is a difference between methods, the figure
+draws that difference with its own interval. For repeated measures, the
+intervals of the separate means say nothing about the difference
+\citep[pp.~176--177]{cumming2005inference}, and researchers asked to place two
+means ``just significantly different'' erred with both interval and
+standard-error bars (Figure~\ref{fig:belia}). When the methods ran on the
+same seeds, the interval is that of the per-seed changes, which
+\code{pv.mean\_ci} computes; otherwise the two margins combine as for
+independent groups, by the formula in the tree's note. Drawing the difference
+beside the data is argued for by \citet{ho2019moving}, but how readers take a
+drawn difference has not been tested \citep{hofman2020visualizing}.
+
+\begin{figure}[tb]
+  \centering
+  \fig{belia}
+  \caption{\textbf{Researchers put interval bars too far apart and
+    standard-error bars too close.} The $p$ implied by where respondents
+    placed the second of two means so that they looked just significantly
+    different, by discipline; the correct placement gives $p=.05$. Values
+    from \citet[p.~393]{belia2005researchers}.}
+  \label{fig:belia}
+\end{figure}
+
+When the claim is the level of each method, the figure draws a point with
+its interval, never a bar: with bars, readers judged values inside the bar
+likelier than values above it \citep[Secs.~4.2, 4.4]{correll2014error}. An
+interval alone still misleads. Shown 95\% confidence intervals, crowd workers
+put the chance that a treated case beats a control at 86\% against a true 57\%
+\citep[p.~5]{hofman2020visualizing}; data scientists shown standard errors put
+it at 76\%, and at 61\% when every data point was drawn too, against a true
+59\% \citep[Fig.~3]{zhang2023illusion}. pubviz therefore draws the runs
+faintly under the estimate by default. It can also draw the interval as a
+gradient, which among researchers halved the drop in confidence around
+$p=.05$, as a violin did; readers took the violin of a mean for the violin of
+the data \citep[Fig.~4]{helske2021can}, so pubviz offers only the gradient.
+
+When the claim is how the runs spread, the number of runs decides. With a
+handful, every run is drawn as a dot: summary statistics are only meaningful
+when there are enough data to summarize \citep[pp.~5--6]{weissgerber2015beyond},
+and with five points the shape of a distribution cannot be told
+\citep[Fig.~7]{weissgerber2019reveal}. With many, no display is best for
+everything. With 200 points per chart, box plots were best for the median and
+for comparing two groups and worst for the range, and most readers took the
+box for a cluster; strip plots were best for the range and violins for
+clusters \citep[Sec.~4]{lotteraner2026investigating}. Strip plots also gave
+the best estimates of spread \citep[Table~1]{newburger2023fitting}. The
+cut-off between the two, about ten runs, is our rule of thumb;
+\citet{weissgerber2019reveal} find no clear guideline for it.
+
+\subsection{What a model does}
+
+\begin{figure}[tb]
+  \centering
+  \pvtreeModel
+  \caption{\textbf{Exhibits of a model at work show its errors, its outputs
+    or the weights its outputs rest on.} Chart 5 of the decision tree.}
+  \label{fig:tree-model}
+\end{figure}
+
+A confusion matrix shows which classes a classifier mixes up, and its
+readers are easily confused themselves. Lay readers did better when the
+cells used the task's own words instead of generic terms
+\citep[Table~2]{shen2020designing}; in a think-aloud study, users swapped
+missed cases and false alarms when rows and columns looked alike, and found
+counts easier than rates \citep[Secs.~7.4--7.5]{beauxisaussalet2019supporting}.
+pubviz names the axes as the true and the predicted class, shows each row as
+shares of its class so that rare and common classes compare, an argument
+made without a study \citep[Sec.~4.1]{gortler2022neo}, and prints the counts
+beside the shares when there are few classes. No study has tested counts
+against shares, the treatment of the diagonal or the color scale
+\citep[Sec.~7.1]{ren2017squares}.
+
+Curves over every threshold rest on methodological arguments rather than on
+readers. An ROC curve does not change with class balance and a
+precision--recall curve does \citep[Sec.~4.2]{fawcett2006introduction}, so on
+unbalanced data an ROC curve can look nearly perfect while the
+precision--recall curve shows much room to improve
+\citep[Fig.~1]{davis2006relationship}. pubviz draws the precision--recall curve
+in steps, since straight lines between its points overstate the area
+\citep[Sec.~4]{davis2006relationship}, with the share of positives as its
+baseline \citep[p.~7]{saito2015precision}, and draws DET curves on
+normal-deviate scales for verification, where good systems would otherwise
+bunch in one corner \citep{martin1997det}. A reliability diagram hides how
+many cases each bin holds \citep[Sec.~2]{guo2017calibration}, and its look
+changes with the number of bins \citep[Fig.~2]{dimitriadis2021stable}; pubviz
+places each point at its bin's mean prediction
+\citep[Sec.~2]{brocker2007increasing} and draws the counts underneath.
+
+Outputs that are images are compared side by side, which is slow and misses
+small differences: in a flicker task, viewers needed many alternations to see
+a change between two photographs until they were told where it was
+\citep[p.~370]{rensink1997see}. In interactive viewers, separate windows shown
+together beat zooming once a pattern had more than a few parts
+\citep[Table~I]{plumlee2006zooming}, and magnified insets made comparisons more
+accurate than outlined boxes \citep[Sec.~6.1]{lekschas2020pattern}. pubviz
+therefore enlarges one region under every image and can add each output's
+difference from the reference, as a difference image helped radiologists find
+changes \citep[abstract]{difazio1997digital}. Which examples to show matters as
+much as how: random examples give the least biased picture
+\citep[Sec.~4.2]{vanmiltenburg2021underreporting}. For sound we found no study
+of spectrogram displays. pubviz draws levels in decibels down to a fixed
+floor, from white for quiet to near black for loud in even lightness steps
+(Section~\ref{sec:checks}), so that darker means more as readers expect on a
+white page \citep[Sec.~3]{schloss2019mapping}. In another field, a rainbow map
+led medical students to find fewer of the regions they looked for even
+though they preferred it \citep[Sec.~6.5]{borkin2011evaluation}.
+
+Exhibits of what a model's outputs rest on show weights, and the weights
+claim less than they seem to. Very different attention weights gave the same
+output \citep[Sec.~4.2]{jain2019attention}, raw attention in the upper layers of
+a Transformer is close to uniform \citep[Sec.~2]{abnar2020quantifying}, and some
+saliency methods give nearly the same map for a model whose weights were
+randomized \citep[Sec.~3]{adebayo2018sanity}. Readers also trust them too much:
+on one dataset they found Grad-CAM explanations of wrong predictions nearly
+as convincing as those of right ones \citep[Table~1]{kim2022hive}. pubviz draws
+attention without numbers, lays a saliency map over the image in grey with
+its opacity rising with the weight, and gives a signed map two hues, since a
+map of absolute values hides where the sign flips
+\citep[Fig.~4]{adebayo2018sanity}. Over text it shades the words in the
+paper's own font; there readers judged longer words as more important at the
+same shade \citep[Sec.~5.1]{schuff2022human}, a bias a caption can only warn
+of. Maps of embeddings mislead differently. In t-SNE maps the sizes of
+clusters and the distances between them may mean nothing
+\citep[Secs.~2--3]{wattenberg2016tsne}, and readers found clusters well but
+judged which was nearest or densest poorly
+\citep[Sec.~6.3.1]{xia2022revisiting}. pubviz names each class on the map,
+hides the axis values, and folds the classes beyond the colors readers can
+tell apart into one grey group; in scatterplots, accuracy fell as categories
+were added, above all from six on \citep[Secs.~4.1, 5.2]{tseng2023categorical}.
+
+\begin{table}[tb]
+  \centering\small
+  \caption{\textbf{The choices about what to draw rest on studies; the
+    choices about how to mark it rest on judgment.} The answers of the
+    decision tree and the design choices of pubviz, by what supports them.}
+  \label{tab:status}
+  \begin{pvtable}[ranks=0, stretch=1.05]{ll}
+    \toprule
+    Choice & Basis \\
+    \midrule
+    \pvsection{Supported by studies with readers} \\
+    Table for lookup, figure for shape & \citet{saket2019task}; \citet{braithwaite2013flexibility} \\
+    Compared values on one positional scale & \citet{cleveland1984graphical}; \citet{heer2010crowdsourcing} \\
+    Bars from zero; differences drawn when small & \citet{pandey2015deceptive}; \citet{correll2020truncating} \\
+    Lines for trends, bars for separate values & \citet{zacks1999bars} \\
+    One axis per measure & \citet{isenberg2011study}; \citet{haroz2016connected} \\
+    The interval of the comparison, not two intervals & \citet{cumming2005inference}; \citet{belia2005researchers} \\
+    Runs drawn under an estimate & \citet{hofman2020visualizing}; \citet{zhang2023illusion} \\
+    Points for a handful of runs & \citet{weissgerber2015beyond,weissgerber2019reveal} \\
+    Distribution display by what is judged & \citet{lotteraner2026investigating}; \citet{newburger2023fitting} \\
+    Arrows for flow; no crossings & \citet{heiser2006arrows}; \citet{purchase1997aesthetic} \\
+    Unbroken regions; a title on every picture & \citet{saket2014node}; \citet{haroz2015isotype} \\
+    A linear scale, not a radar chart & \citet{diehl2010radial}; \citet{fuchs2017glyphs} \\
+    Enlarged regions shown together & \citet{plumlee2006zooming}; \citet{lekschas2020pattern} \\
+    Few category colors in a map of points & \citet{tseng2023categorical} \\
+    \pvsection{Supported by methodological arguments} \\
+    Ratings as answers, not only a mean & \citet{liddell2018analyzing} \\
+    Precision--recall when positives are rare & \citet{saito2015precision} \\
+    Reliability diagrams with the cases per bin & \citet{guo2017calibration} \\
+    Confusion rows as shares of each class & \citet{gortler2022neo} \\
+    Weights shown without a claim of cause & \citet{jain2019attention} \\
+    No reading of distances in t-SNE maps & \citet{wattenberg2016tsne} \\
+    \pvsection{Supported by our checks (Section~\ref{sec:checks})} \\
+    Colormaps ordered in lightness & Table~\ref{tab:colormaps}, Figure~\ref{fig:lightness} \\
+    Table fills at a fixed lightness & Table~\ref{tab:fills}, Figure~\ref{fig:fills} \\
+    Diagram blocks named by label, not by fill & Figure~\ref{fig:palettes} \\
+    Spectrogram levels in even lightness steps & Table~\ref{tab:colormaps} \\
+    \pvsection{Our judgment, untested} \\
+    Best value in bold with a fill & by analogy with \citet{strobelt2016guidelines} \\
+    A key under each table & by inference from \citet{correll2014error} \\
+    Better values darker in every column & against \citet{schloss2019mapping} \\
+    The accent for the paper's own method & by analogy with \citet{wolfe2004attributes} \\
+    Claim first in each caption & by inference from \citet{kong2018frames} \\
+    Diverging stacked bars; ties set aside & after \citet{heiberger2014design} \\
+    Fitted and held-out points told apart & after \citet{openai2023gpt4} \\
+    Overlay opacity rising with the weight & by inference from \citet{schloss2019mapping} \\
+    Spectrogram floor of $-80$~dB & a tool default \citep{librosa2026source} \\
+    Sections with a gap, a name and a band & after \citet{bae2014reinforcing} \\
+    Rounded links, open arrowheads, no borders & none \\
+    Thresholds: six groups, eight lines, ten runs, six classes & none \\
+    \bottomrule
+  \end{pvtable}
+\end{table}
+
+\section{Drawing the exhibit}\label{sec:design}
+
+\subsection{One accent color}
+
+Every color in pubviz is derived from one accent color, in OKLab, a color
+space built so that equal distances look about equally different
+\citep{ottosson2020oklab}. The accent gives a strong color for the paper's
+own method in figures; three fills for the best, second and third values of
+a table, at fixed lightness levels; a band for section rows; a nine-step ramp
+for shading cells and heatmaps, with lightness in one direction; and six
+light fills for kinds of diagram blocks. Green and red for changes that help
+or hurt are set apart from the accent. The LaTeX package and the Python
+library compute the same colors from the same rules, and a test checks that
+they agree for every role.
+
+Fixed lightness levels are a choice the studies do not make for us.
+Designer ramps grown from one seed color were read at least as well as
+straight interpolations and were rated more pleasant
+\citep[Sec.~4.1]{smart2020color}, and guidance on ramps puts the order in
+lightness steps \citep[p.~29]{harrower2003colorbrewer}, but neither says how
+a table's fills should be placed. Our check in Section~\ref{sec:checks} shows
+what fixed levels buy: a fill made by mixing the accent with white, the usual
+\code{blue!40} of LaTeX, changes its lightness with the hue, while a fill at a
+fixed lightness looks the same for every accent. We set the best fill at a
+lightness of 0.85, which in our check keeps the best and second fills apart
+in grey for every preset accent while black text on them stays easy to read.
+
+\subsection{Marks and the key}
+
+Inside a table, the package finds the numbers, reads the direction of each
+measure from an arrow where the measure is named (\code{Acc~\textbackslash
+pvup}, \code{WER~\textbackslash pvdown}), ranks the values, and marks them:
+bold and the first fill for the best value, the second fill for the next
+(Table~\ref{tab:modes}). Ties share a mark. With \code{delta=absolute} or
+\code{delta=relative}, a row marked as the baseline makes every other value
+carry its signed change, colored by whether it helps. The
+key under the table, \code{\textbackslash pvkey}, has one line for each kind
+of mark the table actually shows, and each line opens with the mark itself,
+so the caption is free to state the finding.
+
+\begin{table}[tb]
+  \centering\scriptsize
+  \setlength{\tabcolsep}{2.4pt}
+  \newcommand\demo[1]{%
+    \begin{minipage}[t]{0.325\linewidth}\centering
+      \textsf{mode=#1}\par\smallskip
+      \pvsetup{mode=#1}%
+      \begin{pvtable}[delta=absolute]{lccc}
+        \toprule
+        Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+        \midrule
+        \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+        Prior A & 72.3 & 11.9 & 0.35 \\
+        Prior B & 71.6 & 12.8 & 0.22 \\
+        \pvours Ours & 74.0 & 10.2 & 0.28 \\
+        \bottomrule
+      \end{pvtable}
+      \pvkey[baseline=Base]
+    \end{minipage}}
+  \caption{\textbf{The same table keeps its meaning in color, in grey and
+    without color.} The package marks the best value in bold with a fill and
+    the second with a lighter fill, adds each change against the baseline,
+    and writes the key from what the table shows. Illustrative numbers.}
+  \label{tab:modes}
+  \demo{color}\hfill\demo{gray}\hfill\demo{plain}
+\end{table}
+
+These marks rest partly on analogy. Bold with a background fill is the pair
+\citet[Sec.~8.1]{strobelt2016guidelines} recommend for highlighted words, and
+when a display varies in both lightness and hue, viewers group it by
+lightness first \citep[p.~1176]{healey2012attention}; we take this as one
+reason to place the fills by lightness. Every color cue has a
+second cue that needs no color: the best value is bold as well as filled, a
+change carries its sign, and in \code{mode=plain} the second value is
+underlined. Printing the sign matters because the meaning of red is learned:
+Chinese stockbrokers, for whom red marks a rising price, did better after a
+red cue, while students did worse \citep[Results]{zhang2014experience}.
+
+\subsection{Grey and plain print}
+
+A venue that prints in black and white gets \code{mode=gray}, in which every
+color becomes the grey of the same lightness, and \code{mode=plain}, which
+drops the fills for bold and underline. Diverging schemes do not survive a
+black-and-white copy \citep[p.~30]{harrower2003colorbrewer}, and no method of
+turning color images to grey was best for every image
+\citep[Sec.~4.2]{cadik2008perceptual}; pubviz therefore designs the grey
+version rather than leaving it to a printer, and orders every scale it uses
+in lightness. APT already chose different designs for color and monochrome
+output \citep[Sec.~9]{mackinlay1986apt}; pubviz applies one switch to
+tables, figures and diagrams together.
+
+\subsection{Uncertainty}
+
+Three figure kinds follow the last chart of the tree. \code{pv.deltas} draws
+the difference from a baseline with the interval of that difference, and
+\code{pv.mean\_ci} gives the interval of per-seed changes when runs are
+paired. \code{pv.means} draws the level of each method as a point and an
+interval, or as a gradient, over the runs drawn faintly underneath.
+\code{pv.dots} draws every run of a handful as a dot, moving dots that would
+cover each other, and \code{pv.distributions} draws many runs as a box plot,
+a strip, a violin or a histogram, chosen by what the reader should judge; it
+warns when a method has too few runs to summarize. None of the three uses a
+bar for an estimate.
+
+\subsection{Groups within a figure}
+
+Results often have two levels: the settings of one model, or the variants of
+one ablated part. pubviz groups them into sections, as a table does with its
+section rows, with three cues that agree: space before each section, its name
+beside or under its members, and a light grey band behind it
+(Figure~\ref{fig:sections}). An enclosing region is among the strongest
+grouping cues: when it conflicted with spacing, 21 of 22 observers grouped by
+the region \citep[p.~352]{montoro2015competicion}, and when people rebuilt
+two-level structures from web-page layouts, enclosing boxes helped most and
+cues that agreed beat cues that competed
+\citep[Table~5, Sec.~4.4]{bae2014reinforcing}. pubviz therefore gives every
+section a band by default rather than every other one. Grouping has a price:
+it speeds comparisons within a group mainly by slowing those across groups
+\citep[Exp.~3]{nothelfer2017redundant}, and gaps between groups make the
+overall extreme less obvious \citep[Sec.~5.5]{fygenson2024arrangement}, so
+sections suit a claim about the groups. No study has tested bands in charts.
+The band is a neutral grey, so it is not read as a mark of ours, and it is
+lighter than the tints publishers ask for in print \citep{ams2017graphics}; a
+printer may drop it, and the space and the names still carry the groups.
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{\linewidth}\centering
+    \fig{catalog/bars-sections}\caption{\code{pv.bars} with sections of benchmarks}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/means-sections}\caption{\code{pv.means} with a model and its settings}
+  \end{subfigure}
+  \caption{\textbf{Space, a name and a band mark each section, and agree.}
+    The second figures of the repository's \code{bars.py} and
+    \code{means.py}; illustrative numbers. In (b) the rows are named as
+    (model, setting) pairs, so a setting's name can repeat across models.}
+  \label{fig:sections}
+\end{figure}
+
+\subsection{Pictures, sound and weights}
+
+The exhibits of a model at work keep the rules of the rest. Every scale
+orders its values in lightness: the heatmap ramp for confusion matrices and
+attention, and for spectrograms and the difference maps under images a grey
+ramp from white to near black, which prints in grey unchanged. Ours keeps the
+accent in classifier curves, and the pitch contour on a spectrogram takes it
+too, since the spectrogram itself has no hue. A saliency map is laid over the
+image in grey, so the only color on the image is the map's. Signed values use
+the two hues for changes that help or hurt, and keep a second cue that needs
+no color: a signed word shaded with \code{\textbackslash pvshade*} is also
+underlined when its weight is negative. Axis titles such as ``True class'' or
+``Recall'' follow the paper's language.
+
+\subsection{Sizes from the paper's own layout}
+
+A figure built larger than its column and shrunk to fit prints its labels
+smaller than the text around them. pubviz avoids this by building each
+figure at its printed width. Each compile of the paper writes a layout file,
+\code{<jobname>.pubviz.json}, with the column width, the text width, the
+body font size, the font families, the colors and the words of the key.
+\code{pv.use} reads it, sizes the figure text a little below the body text,
+and colors the figures from the same accent as the tables; \code{pv.save}
+warns when a figure's width changed after it was made, when it has an axes
+title that belongs in the caption, when text falls below five points, or
+when texts overlap or run off the figure. The figure functions widen their
+axes so that the values they print stay inside.
+Because the layout comes from the paper's own compilation, the figures follow
+any template without a table of venue sizes.
+
+\subsection{Languages}
+
+The words of a key, and the few words a figure writes itself, follow the
+paper's language. English is the default, Traditional and Simplified Chinese,
+Japanese and Korean are built in, and any other language is a list of words
+given to \code{\textbackslash pvdefinelanguage}; the punctuation, and whether
+words are separated by spaces, are part of that list. The layout file carries
+the words to the figures, so a language defined in LaTeX reaches them too.
+Chinese, Japanese and Korean characters in a figure fall back to an installed
+font for that language and then to those of the others.
+
+\subsection{Diagrams}
+
+With \code{\textbackslash usepackage[diagrams]\{pubviz\}} the package adds
+TikZ styles for method diagrams: blocks, operations, flow arrows and groups.
+By default only the part a paper adds takes the accent
+(Figure~\ref{fig:transformer}); with \code{pv kinds} each kind of block gets a
+light fill of its own. Those fills are too close to tell apart under color
+vision deficiency and in grey (Section~\ref{sec:checks}), so the label inside
+each block, not its fill, names it. The diagram environment measures its
+width and warns when it is wider than the line, since scaling it down would
+shrink its text as well.
+
+For stages and flows, pubviz also has a lighter style
+(Figure~\ref{fig:light-diagrams}): a stack of layers drawn as a small picture
+with a title above it, thin grey links with open arrowheads, and a light
+region behind the parts that belong together. Method diagrams are close to
+universal in machine learning papers: 82\% of the long papers at one NLP
+conference had a diagram that was not a result, and 64\% a system diagram
+\citep[Sec.~4.1]{marshall2021number}. Little tests their style. Text labels
+were read with fewer errors than pictographs standing in for them
+\citep[Exp.~1]{haroz2015isotype}, so every picture keeps its title, and readers
+of neural network diagrams disagree on whether a drawn count is meant
+\citep[Table~3]{marshall2025evidence}, so the real count goes in the grey
+note. Unbroken group regions did not slow readers tracing paths
+\citep[Sec.~5]{saket2014node}, while fragmented ones with labels on top did
+\citep[Sec.~IV.B]{jianu2014how}, and flowcharts were followed best left to
+right \citep[abstract]{krohn1983flowcharts}. Rounded corners, open arrowheads
+and blocks without borders are our choice; no study has tested them.
+
+\begin{figure}[tb]
+  \centering
+  \transformer[pv kinds=false, ffn/.append style={pv new}]
+  \caption{\textbf{Only the part a paper adds takes the accent.} A
+    Transformer drawn with the pubviz styles, with the feed-forward block
+    taken as the new part. With \code{pv kinds}, each kind of block would get
+    a light fill of its own instead.}
+  \label{fig:transformer}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{\linewidth}\centering
+    \looped\caption{Blocks that run several times with shared weights}
+  \end{subfigure}\\[8pt]
+  \begin{subfigure}{\linewidth}\centering
+    \asr\caption{A pipeline from speech to text}
+  \end{subfigure}\\[8pt]
+  \begin{subfigure}{\linewidth}\centering
+    \retrieval\caption{Retrieval before generation}
+  \end{subfigure}
+  \caption{\textbf{A lighter style draws stages and flows with few lines.}
+    Stacks of layers as small pictures, thin grey links with open arrowheads,
+    a title and a grey note above each stage, and a light region behind the
+    parts that belong together. The part each example takes as new is in
+    the accent; in grey and plain print it turns near black with a heavier
+    line.}
+  \label{fig:light-diagrams}
+\end{figure}
+
+\section{The exhibits}\label{sec:catalog}
+
+Every exhibit the tree can reach has a pubviz call (Table~\ref{tab:calls}),
+and every figure kind comes with a short script that draws the examples in
+Figures~\ref{fig:catalog}--\ref{fig:catalog-media} from their data to the
+LaTeX that includes them.
+
+\begin{table}[tb]
+  \centering\small
+  \caption{\textbf{Every answer of the tree has a call that draws it.} The
+    exhibits of pubviz and the chart of the decision tree that leads to
+    each.}
+  \label{tab:calls}
+  \begin{pvtable}[ranks=0, stretch=1.05]{lll}
+    \toprule
+    Exhibit & Call & Chart \\
+    \midrule
+    Result table: ranks, changes, shading, key & \code{pvtable}, \code{\textbackslash pvkey} & 2 \\
+    Method diagram & \code{pvdiagram}, \code{pv} styles & 1 \\
+    Bars from zero & \code{pv.bars} & 3 \\
+    Differences with their intervals & \code{pv.deltas} & 3, 4 \\
+    Series over steps or time & \code{pv.curves} & 1 \\
+    A measure against size, with a fitted law & \code{pv.scaling} & 1 \\
+    Answers on a rating scale & \code{pv.ratings} & 1 \\
+    Trade-off with its frontier & \code{pv.tradeoff} & 1 \\
+    Many items, one value each & \code{pv.ranked} & 3 \\
+    Values over two ordered factors & \code{pv.heatmap} & 3 \\
+    Every run of a handful & \code{pv.dots} & 4 \\
+    Level with the uncertainty of the mean & \code{pv.means} & 4 \\
+    Spread of many runs & \code{pv.distributions} & 4 \\
+    Confusion matrix & \code{pv.confusion} & 5 \\
+    Errors at every threshold & \code{pv.roc}, \code{pv.precision\_recall}, \code{pv.det} & 5 \\
+    Reliability diagram & \code{pv.reliability} & 5 \\
+    Map of embedded points & \code{pv.embedding} & 5 \\
+    Image grid with an enlarged region & \code{pv.images} & 5 \\
+    Spectrogram and waveform & \code{pv.spectrogram}, \code{pv.waveform} & 5 \\
+    Weights between two sequences & \code{pv.attention} & 5 \\
+    Weights over an image & \code{pv.overlay} & 5 \\
+    Weights over words & \code{\textbackslash pvshade}, \code{pv.pvshade} & 5 \\
+    \bottomrule
+  \end{pvtable}
+\end{table}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{\linewidth}\centering
+    \fig{catalog/bars}\caption{\code{pv.bars}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/deltas}\caption{\code{pv.deltas}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/curves}\caption{\code{pv.curves}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/tradeoff}\caption{\code{pv.tradeoff}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/heatmap}\caption{\code{pv.heatmap}}
+  \end{subfigure}
+  \caption{\textbf{Each figure kind marks the paper's own method in the
+    accent and every compared method in grey.} The examples of the
+    repository for results measured once and for series, drawn at the width
+    shown here; illustrative numbers.}
+  \label{fig:catalog}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/dots}\caption{\code{pv.dots}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/means}\caption{\code{pv.means}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/distributions}\caption{\code{pv.distributions}, box}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/distributions-strip}\caption{\code{pv.distributions}, strip}
+  \end{subfigure}
+  \caption{\textbf{The figures for repeated runs show the runs themselves.}
+    The examples of the repository for estimates over seeds and for
+    distributions; illustrative numbers. The box plot in (c) hides the
+    second, slow mode of the baseline that the strip in (d) shows.}
+  \label{fig:catalog-runs}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/ranked}\caption{\code{pv.ranked}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/scaling}\caption{\code{pv.scaling}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/ratings}\caption{\code{pv.ratings}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/ratings-preference}\caption{\code{pv.ratings}, ties aside}
+  \end{subfigure}
+  \caption{\textbf{Many items become a sorted dot chart, scale a fitted
+    law on log axes, and ratings the share of each answer.} The examples of
+    the repository for results over many items, over model size and from
+    human judgments; illustrative numbers. In (b) the hollow point was held
+    out of the fit.}
+  \label{fig:catalog-scale}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/confusion}\caption{\code{pv.confusion}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/roc}\caption{\code{pv.roc}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/precision_recall}\caption{\code{pv.precision\_recall}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/det}\caption{\code{pv.det}}
+  \end{subfigure}
+  \caption{\textbf{The same scores look strong as an ROC curve and weak as
+    a precision--recall curve when positives are rare.} The examples of the
+    repository for a model's errors; (b) and (c) draw the same made-up scores
+    with 5\% positives.}
+  \label{fig:catalog-model}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/reliability}\caption{\code{pv.reliability}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/embedding}\caption{\code{pv.embedding}}
+  \end{subfigure}\\[4pt]
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/attention}\caption{\code{pv.attention}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/overlay}\caption{\code{pv.overlay}}
+  \end{subfigure}\\[6pt]
+  \begin{subfigure}{\linewidth}\centering\small
+    \pvshade{0.08}{the} \pvshade{1.00}{cat} \pvshade{0.48}{sat} \pvshade{0.13}{on}
+    \pvshade{0.05}{the} \pvshade{0.73}{mat} \pvshade{0.03}{.}\qquad
+    \pvshade*{0.03}{The} \pvshade*{0.11}{film} \pvshade*{0.03}{was} \pvshade*{-0.58}{not}
+    \pvshade*{-0.84}{bad} \pvshade*{0.05}{at} \pvshade*{0.08}{all}\pvshade*{0.01}{,}
+    \pvshade*{0.21}{acting} \pvshade*{1.00}{superb}
+    \caption{\code{\textbackslash pvshade} and \code{\textbackslash pvshade*}, set in this report's own text}
+  \end{subfigure}
+  \caption{\textbf{Probabilities, places and weights each keep one scale and
+    no claim of cause.} The examples of the repository for whether a model's
+    probabilities hold, where it places its inputs and what its outputs rest
+    on; the points, weights and maps are made up.}
+  \label{fig:catalog-weights}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/images}\caption{\code{pv.images}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.485\linewidth}\centering
+    \fig{catalog/spectrogram}\caption{\code{pv.spectrogram}, \code{pv.waveform}}
+  \end{subfigure}
+  \caption{\textbf{Outputs are compared region by region and level by
+    level.} The examples of the repository for a model's outputs; the images
+    and the sound are made up. In (a) the boxed region is enlarged under each
+    image, and the bottom row is each output's difference from the
+    reference.}
+  \label{fig:catalog-media}
+\end{figure}
+
+\section{Our checks}\label{sec:checks}
+
+The studies leave three color choices open, and we checked them by
+computation. All measures use OKLab \citep{ottosson2020oklab}, with lightness
+$L$ in points from 0 (black) to 100 (white); text contrast is the WCAG ratio,
+from 1 to 21, where 7 is the threshold for enhanced readability
+\citep{w3c2008wcag}. Color vision deficiency is simulated with the matrices
+of \citet{machado2009cvd} at full severity, which we apply to linear RGB
+because the authors do not say which RGB they assume. A script in the
+repository computes every value.
+
+\paragraph{Colormaps.} A colormap whose lightness turns back reorders its
+values in a grey print. Table~\ref{tab:colormaps} measures eight maps: jet and
+turbo turn back by more than 50 points, while viridis, magma, Greys and the
+three maps of pubviz never do (Figure~\ref{fig:lightness}). No map is best on
+every measure. The table shading of pubviz spans only about 20 points so that
+black text stays readable on every cell, and its figure map spans twice that
+for heatmaps, where the value is printed in each cell. Its level map, for
+spectrograms and difference maps, gives up black text for a span of about 80
+points, close to that of Greys, while its steps stay far more even than those
+of Greys.
+
+\begin{table}[tb]
+  \centering\small
+  \caption{\textbf{Only the rainbow maps turn back in lightness, and no map is
+    best on every measure.} Reversal: the largest move of lightness against
+    the map's direction; span: the range of lightness ($L$ points);
+    unevenness: variation of the color step between equal data steps; black
+    text: the lowest WCAG contrast of black text on the map.}
+  \label{tab:colormaps}
+  \gen{colormaps}
+\end{table}
+
+\paragraph{Categorical palettes.} A palette that merges for a reader with a
+color vision deficiency, or in grey, loses the identity of its series.
+Figure~\ref{fig:palettes} gives the smallest difference between any two of
+six colors. The first six colors of matplotlib nearly merge under simulated
+protanopia; the Okabe--Ito colors keep apart under both deficiencies but
+include two of the same lightness, which a grey print merges; and the light
+kind fills of pubviz are close in every condition, which is why a
+diagram's labels must carry the kinds.
+
+\begin{figure}[tb]
+  \centering
+  \begin{minipage}[t]{0.485\linewidth}\centering
+    \fig{lightness}
+    \captionof{figure}{\textbf{Rainbow maps go dark, light and dark again;
+      the others change lightness in one direction.} OKLab lightness along
+      each colormap; colored lines: the three maps of pubviz.}
+    \label{fig:lightness}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.485\linewidth}\centering
+    \fig{palettes}
+    \captionof{figure}{\textbf{Common palettes merge under color vision
+      deficiency or in grey.} Smallest OKLab difference between any two of
+      six colors ($\times 100$); bold: the largest in each column.}
+    \label{fig:palettes}
+  \end{minipage}
+\end{figure}
+
+\paragraph{Table fills.} A fill made by mixing the accent with white changes
+its lightness with the hue: across the seven accents of pubviz, the best
+fill of a 40/15 mix varies by 9 points (Table~\ref{tab:fills}). Fills at a
+fixed lightness do not vary, and they expose a trade-off between how far
+apart the best and second fills stay in grey and how well black text reads
+on the best fill (Figure~\ref{fig:fills}). Every mix we tried is beaten on
+both counts by some fixed level. At 0.90 the grey gap shrinks to about five
+points; at 0.85, the level pubviz now uses, it is about ten, with black
+text still above a contrast of 12.
+
+\begin{figure}[tb]
+  \centering
+  \begin{minipage}[t]{0.485\linewidth}\centering
+    \vspace{0pt}\footnotesize\setlength{\tabcolsep}{3pt}
+    \captionof{table}{\textbf{Fixed-lightness fills look the same for every
+      accent.} Spread: range of the best fill's lightness over seven accents;
+      grey gap (best against second fill) and contrast (black text on the
+      best fill): the worst accent.}
+    \label{tab:fills}
+    \gen{fills}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.485\linewidth}\centering
+    \vspace{0pt}\fig{fills}
+    \captionof{figure}{\textbf{Fixed levels beat every mix with white, and
+      the level trades grey separation for text contrast.} Worst case over
+      seven accents; the dashed line joins the designs no other design beats
+      on both measures.}
+    \label{fig:fills}
+  \end{minipage}
+\end{figure}
+
+\paragraph{The software.} A test suite compiles the package with pdfLaTeX,
+LuaLaTeX and XeLaTeX, checks that the LaTeX and Python sides derive the same
+color for every role, checks each line of the key in several languages, and
+draws every example figure, failing on any problem \code{pv.save} reports. The
+venue presets of the Python library were measured from the layout files of
+the venues' own classes where we could compile them.
+
+\section{Limits}\label{sec:limits}
+
+The evidence covers less than the tree. Most experiments used simple stimuli
+with crowd workers or students, such as one ratio between two marks or
+isolated color patches, and how far their effects reach expert readers of
+real papers is untested. No study we found tested how a table should mark its
+best value, a key under a table, a display of trade-offs, twin y axes for two
+measures, or figures of three to ten runs, the usual number of seeds; these
+answers in the tree are our judgment, and Table~\ref{tab:status} lists them.
+The exhibits of a model at work rest on still less. For confusion matrices,
+classifier curves, reliability diagrams, attention matrices and spectrograms
+we found methodological arguments and tool conventions, not studies of how
+readers take these displays in a paper; the studies of image comparison and
+insets used interactive viewers or radiographs, and the counts of figure
+types we cite cover no speech venue.
+The thresholds in the tree are rules of thumb. Our checks are computations on
+a color model, not studies with readers: they assume that OKLab lightness
+predicts what a grey print keeps and that the deficiency matrices apply to
+linear RGB. We chose the studies by topic, without a search protocol, and the
+related work in Section~\ref{sec:related} covers the items we read. The words
+of the key in Japanese and Korean have yet to be checked by native speakers.
+
+\section{Conclusion}\label{sec:conclusion}
+
+Research on graphical perception says a good deal about what an exhibit
+should draw and much less about how a paper should mark and color it.
+pubviz puts the first part into a decision tree, which reaches from result
+tables to the exhibits of a model at work, and into the defaults of a LaTeX
+package and a Python library, and marks the second part as judgment,
+so a researcher can see which choices rest on readers and which on us. The
+places where the tree rests on judgment, above all the marking of tables, are
+where a study with readers would help most.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

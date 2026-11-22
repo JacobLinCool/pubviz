@@ -1,0 +1,24 @@
+\documentclass[border=8pt, varwidth=30cm]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}
+\usepackage{pubviz}
+\begin{document}
+\small\centering
+\begin{pvtable}[by=row]{l*{5}{c}}
+  \toprule
+   & \pvours Ours & Alpha & Beta & Gamma & Delta \\
+  \midrule
+  \pvsection{Overall} \\
+  Index v5 & 20.1 & 4.4 & 6.3 & 20.1 & 13.6 \\
+  Index v2 & 46.5\% & -- & -- & -- & 29.8\% \\
+  \pvsection{Coding} \\
+  \pvlabel{CodeBench v2}{agent harness v0.2} & 15.1\% & 0.0\% & 1.5\% & 14.9\% & 6.1\% \\
+  \pvlabel{RepoFix (Hard)}{agent harness v2.4} & 77.9\% & 14.2\% & 44.3\% & 73.8\% & 44.1\% \\
+  \pvsection{Search and tool use} \\
+  WebQA & 79.0\% & 37.0\% & 63.9\% & 61.6\% & 78.9\% \\
+  ToolBench & 82.7\% & 54.2\% & 75.5\% & 77.3\% & 67.7\% \\
+  Latency (s) \pvdown & 1.42 & 0.91 & 1.10 & 1.38 & 2.05 \\
+  \bottomrule
+\end{pvtable}
+\pvkey
+\end{document}

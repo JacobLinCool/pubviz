@@ -1,0 +1,175 @@
+% Body of the example paper. Each file in venues/ sets up a document class
+% and its front matter, defines \venue, and inputs this file. All numbers are
+% made up for illustration.
+
+\emergencystretch=1.5em
+
+\makeatletter
+\newenvironment{widetable}
+  {\if@twocolumn\begin{table*}[t]\else\begin{table}[t]\fi\centering\small
+   \setlength{\tabcolsep}{5pt}}
+  {\if@twocolumn\end{table*}\else\end{table}\fi}
+\newenvironment{widefigure}
+  {\if@twocolumn\begin{figure*}[t]\else\begin{figure}[t]\fi\centering}
+  {\if@twocolumn\end{figure*}\else\end{figure}\fi}
+\makeatother
+\newcommand\examplefig[1]{%
+  \IfFileExists{../build/figs/\venue/#1.pdf}
+    {\includegraphics[width=\linewidth]{../build/figs/\venue/#1.pdf}}
+    {\fbox{\parbox{0.9\linewidth}{\centering\footnotesize
+      Run \texttt{make examples} to draw this figure.}}}}
+
+\section{Tables}
+
+Each table below is an ordinary table body inside \texttt{pvtable}. The
+package finds the numbers, marks the best and second-best value in each
+column or row, and colors the marks from one accent color. The key under
+each table shows every mark the table uses, so the captions only state the
+finding and the setup.
+Table~\ref{tab:leaderboard} compares methods across many benchmarks,
+Table~\ref{tab:main} adds the change against a baseline,
+Table~\ref{tab:ablation} shows only that change, and Table~\ref{tab:grid}
+shades a grid of values.
+
+\begin{widetable}
+  \caption{\textbf{Ours leads on most benchmarks, but not on latency.}
+    Benchmarks are rows and methods are columns.}
+  \label{tab:leaderboard}
+  \begin{pvtable}[by=row]{l*{5}{c}}
+    \toprule
+     & \pvours Ours & Alpha & Beta & Gamma & Delta \\
+    \midrule
+    \pvsection{Overall} \\
+    Index v5 & 20.1 & 4.4 & 6.3 & 20.1 & 13.6 \\
+    Index v2 & 46.5\% & -- & -- & -- & 29.8\% \\
+    \pvsection{Coding} \\
+    \pvlabel{CodeBench v2}{agent harness v0.2} & 15.1\% & 0.0\% & 1.5\% & 14.9\% & 6.1\% \\
+    \pvlabel{RepoFix (Hard)}{agent harness v2.4} & 77.9\% & 14.2\% & 44.3\% & 73.8\% & 44.1\% \\
+    \pvlabel{RepoFix (Multilingual)}{bash only} & 73.7\% & 43.0\% & 66.9\% & 70.0\% & 67.7\% \\
+    \pvsection{Search and tool use} \\
+    WebQA & 79.0\% & 37.0\% & 63.9\% & 61.6\% & 78.9\% \\
+    ToolBench & 82.7\% & 54.2\% & 75.5\% & 77.3\% & 67.7\% \\
+    Latency (s) \pvdown & 1.42 & 0.91 & 1.10 & 1.38 & 2.05 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey
+\end{widetable}
+
+\begin{table}[t]
+  \centering\small
+  \caption{\textbf{Ours improves every metric over the base model.}
+    Accuracy is the mean of three seeds with its standard deviation.}
+  \label{tab:main}
+  \begin{pvtable}[delta=absolute]{lccc}
+    \toprule
+    Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+    \midrule
+    \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+    Prior A & 72.3 & 11.9 & 0.35 \\
+    Prior B & 71.6 & 12.8 & 0.22 \\
+    \pvours Ours & $74.0 \pm 0.4$ & 10.2 & 0.28 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey[baseline=Base]
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \caption{\textbf{Removing the adapter costs the most accuracy.}
+    The full model row gives the absolute values.}
+  \label{tab:ablation}
+  \begin{pvtable}[delta=absolute, show=delta, ranks=0]{lcc}
+    \toprule
+    Variant & Acc \pvup & WER \pvdown \\
+    \midrule
+    \pvbaseline Full model & 74.0 & 10.2 \\
+    without adapter & 70.8 & 11.6 \\
+    without warm-up & 73.1 & 10.4 \\
+    without data mixing & 74.2 & 10.9 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey[baseline=the full model]
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \caption{\textbf{Accuracy grows with both model size and data.}}
+  \label{tab:grid}
+  \begin{pvtable}[heat=table, ranks=0]{lcccc}
+    \toprule
+    & \multicolumn{4}{c}{Training tokens} \\
+    \cmidrule(lr){2-5}
+    Size & 10B & 30B & 100B & 300B \\
+    \midrule
+    125M & 41.2 & 44.0 & 45.1 & 45.6 \\
+    350M & 45.8 & 49.3 & 51.7 & 52.4 \\
+    1.3B & 48.1 & 53.9 & 57.6 & 59.8 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey
+\end{table}
+
+\section{Figures}
+
+Each figure is drawn by its own short script, one per kind of figure, from
+the layout file this document writes. So each one is built at this venue's
+column width with text sized from this venue's body font, and with the same
+accent color as the tables. The scripts are in the \texttt{figures} folder
+next to this paper's source.
+
+\begin{widefigure}
+  \examplefig{bars}
+  \caption{\textbf{Ours scores highest on four of five benchmarks.}
+    Illustrative numbers.}
+  \label{fig:bars}
+\end{widefigure}
+
+\begin{figure}[t]
+  \centering
+  \examplefig{deltas}
+  \caption{\textbf{The adapter matters most; data mixing does not clearly help.}
+    Accuracy change against the full model with 95\% intervals of the
+    change over five seeds.}
+  \label{fig:deltas}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \examplefig{curves}
+  \caption{\textbf{Ours reaches the final reward of the best baseline in
+    less than half the steps.} Mean of three seeds with 95\% intervals.}
+  \label{fig:curves}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \examplefig{tradeoff}
+  \caption{\textbf{Ours moves the accuracy--latency frontier.} The dashed
+    line joins methods that no other method beats on both measures.}
+  \label{fig:tradeoff}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \examplefig{heatmap}
+  \caption{\textbf{Larger models gain more from more data.} The same grid as
+    Table~\ref{tab:grid}; the best value of each column is bold.}
+  \label{fig:heatmap}
+\end{figure}
+
+\section{Diagrams}
+
+Diagrams use the same colors and print modes as the tables, and are drawn at
+the printed size: \texttt{pvdiagram} warns when a diagram is wider than the
+column instead of letting it be scaled down. Figure~\ref{fig:transformer}
+fills its blocks by kind; filling by role would leave every block white
+except the part a paper adds.
+
+\input{../diagrams/transformer}
+\begin{figure}[t]
+  \centering
+  \transformer
+  \caption{\textbf{The model is an encoder and a decoder, each a stack of
+    $N$ identical layers.} Redrawn from Vaswani et al.\ (2017).}
+  \label{fig:transformer}
+\end{figure}

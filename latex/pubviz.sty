@@ -1,0 +1,1976 @@
+% pubviz.sty: result tables and one shared color theme for research papers.
+%
+% Write a table body as you would for tabular. pvtable finds the numbers,
+% marks the best and second-best value in each column (or row), shows changes
+% against a baseline, and colors everything from one accent color. The same
+% accent, written to <jobname>.pubviz.json, styles the Python figures.
+%
+% Documentation: README.md and docs/guide.md in the repository.
+% License: MIT.
+
+\NeedsTeXFormat{LaTeX2e}[2023-11-01]
+\ProvidesExplPackage{pubviz}{2026-11-21}{0.1.0}
+  {Result tables and a shared color theme for research papers}
+
+\RequirePackage{xcolor}
+\RequirePackage{colortbl}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+
+\cs_generate_variant:Nn \regex_match:nnTF { nV }
+\cs_generate_variant:Nn \regex_match:NnTF { NV }
+\cs_generate_variant:Nn \regex_extract_once:NnNT { NV }
+\cs_generate_variant:Nn \regex_extract_once:NnNTF { NV }
+\cs_generate_variant:Nn \tl_if_head_eq_charcode:nNT { V }
+\cs_generate_variant:Nn \seq_set_split_keep_spaces:Nnn { NnV }
+\cs_generate_variant:Nn \seq_put_right:Nn { Ne }
+\cs_generate_variant:Nn \prop_put:Nnn { Nen , Nee , NVe , NeV , NnV , Nne , NVn , NVV }
+\cs_generate_variant:Nn \prop_item:Nn { Ne , NV }
+\cs_generate_variant:Nn \prop_get:NnNT { Ne , NV }
+\cs_generate_variant:Nn \prop_get:NnNTF { Ne , NV }
+\cs_generate_variant:Nn \prop_if_in:NnTF { NV }
+\cs_generate_variant:Nn \prop_if_in:NnT { NV }
+\cs_generate_variant:Nn \msg_warning:nnn { nnV }
+\cs_generate_variant:Nn \str_if_eq:nnTF { Vn }
+
+% ======================================================================
+% Messages
+% ======================================================================
+
+\msg_new:nnn { pubviz } { no-baseline }
+  {
+    The~table~asks~for~changes~(delta=#1)~but~no~row~or~column~is~marked~
+    with~\iow_char:N\\pvbaseline.
+  }
+\msg_new:nnn { pubviz } { section-outside }
+  {
+    \iow_char:N\\pvsection~only~works~inside~pvtable.~In~a~plain~tabular~use~
+    \iow_char:N\\pvsectionrow{<number~of~columns>}{<title>}.
+  }
+\msg_new:nnn { pubviz } { diagram-too-wide }
+  {
+    The~diagram~is~#1pt~wider~than~the~line.~Shorten~labels~or~stack~the~
+    layout;~scaling~it~down~would~shrink~its~text~as~well.
+  }
+\msg_new:nnn { pubviz } { key-before-table }
+  { \iow_char:N\\pvkey~explains~the~pvtable~before~it,~but~there~is~none~yet. }
+\msg_new:nnn { pubviz } { unknown-language }
+  {
+    No~language~'#1'.~Built~in:~en,~zh-tw,~zh-cn,~ja,~ko.~Define~another~with~
+    \iow_char:N\\pvdefinelanguage{#1}{best=...,~second=...,~...}.
+  }
+
+% ======================================================================
+% Options
+% ======================================================================
+
+\tl_new:N \l__pv_accent_tl
+\tl_new:N \l__pv_pos_tl
+\tl_new:N \l__pv_neg_tl
+\tl_new:N \l__pv_mode_tl
+\tl_new:N \l__pv_fill_tl
+\tl_new:N \l__pv_by_tl
+\tl_new:N \l__pv_better_tl
+\tl_new:N \l__pv_delta_tl
+\tl_new:N \l__pv_show_tl
+\tl_new:N \l__pv_heat_tl
+\tl_new:N \l__pv_ties_tl
+\tl_new:N \l__pv_header_tl
+\tl_new:N \l__pv_align_tl
+\tl_new:N \l__pv_underline_tl
+\tl_new:N \l__pv_hpad_tl
+\tl_new:N \l__pv_vpad_tl
+\tl_new:N \l__pv_ours_style_tl
+\tl_new:N \l__pv_missing_tl
+\tl_new:N \l__pv_delta_size_tl
+\tl_new:N \l__pv_stretch_tl
+\int_new:N \l__pv_ranks_int
+\int_new:N \l__pv_label_cols_int
+\int_new:N \l__pv_delta_digits_int
+\bool_new:N \l__pv_bold_best_bool
+\bool_new:N \l__pv_debug_bool
+\bool_new:N \g__pv_layout_bool
+\bool_new:N \l__pv_recolor_bool
+
+\keys_define:nn { pubviz }
+  {
+    % ---- theme
+    accent .code:n =
+      { \__pv_set_color:Nn \l__pv_accent_tl {#1} \bool_set_true:N \l__pv_recolor_bool },
+    theme .choices:nn = { amber, blue, teal, green, red, purple, gray }
+      {
+        \tl_set:Ne \l__pv_accent_tl { \tl_use:c { c__pv_preset_ #1 _tl } }
+        \bool_set_true:N \l__pv_recolor_bool
+      },
+    pos .code:n =
+      { \__pv_set_color:Nn \l__pv_pos_tl {#1} \bool_set_true:N \l__pv_recolor_bool },
+    neg .code:n =
+      { \__pv_set_color:Nn \l__pv_neg_tl {#1} \bool_set_true:N \l__pv_recolor_bool },
+    mode .choices:nn = { color, gray, plain }
+      { \tl_set:Ne \l__pv_mode_tl {#1} \bool_set_true:N \l__pv_recolor_bool },
+    layout-file .bool_gset:N = \g__pv_layout_bool,
+    % ---- how marks look
+    fill .choices:nn = { chip, cell, none } { \tl_set:Ne \l__pv_fill_tl {#1} },
+    ranks .int_set:N = \l__pv_ranks_int,
+    ties .choices:nn = { shared, dense } { \tl_set:Ne \l__pv_ties_tl {#1} },
+    bold-best .bool_set:N = \l__pv_bold_best_bool,
+    underline-second .choices:nn = { auto, true, false }
+      { \tl_set:Ne \l__pv_underline_tl {#1} },
+    align .choices:nn = { l, c, r } { \tl_set:Ne \l__pv_align_tl {#1} },
+    chip-hpad .tl_set:N = \l__pv_hpad_tl,
+    chip-vpad .tl_set:N = \l__pv_vpad_tl,
+    ours-style .tl_set:N = \l__pv_ours_style_tl,
+    missing .tl_set:N = \l__pv_missing_tl,
+    delta-size .tl_set:N = \l__pv_delta_size_tl,
+    stretch .tl_set:N = \l__pv_stretch_tl,
+    debug .bool_set:N = \l__pv_debug_bool,
+    % ---- what a table compares
+    by .choices:nn = { column, row } { \tl_set:Ne \l__pv_by_tl {#1} },
+    better .choices:nn = { higher, lower } { \tl_set:Ne \l__pv_better_tl {#1} },
+    header .tl_set:N = \l__pv_header_tl,
+    label-cols .int_set:N = \l__pv_label_cols_int,
+    delta .choices:nn = { none, absolute, relative } { \tl_set:Ne \l__pv_delta_tl {#1} },
+    show .choices:nn = { both, delta } { \tl_set:Ne \l__pv_show_tl {#1} },
+    delta-digits .int_set:N = \l__pv_delta_digits_int,
+    heat .choices:nn = { none, group, table } { \tl_set:Ne \l__pv_heat_tl {#1} },
+    % ---- words of the key under a table (\pvkey)
+    language .code:n = { \__pv_language:n {#1} },
+    key/best .tl_set:N = \l__pv_key_best_tl,
+    key/second .tl_set:N = \l__pv_key_second_tl,
+    key/third .tl_set:N = \l__pv_key_third_tl,
+    key/missing .tl_set:N = \l__pv_key_missing_tl,
+    key/baseline .tl_set:N = \l__pv_key_baseline_tl,
+    key/ours .tl_set:N = \l__pv_key_ours_tl,
+    % ---- diagrams (TikZ styles, loaded only with this option)
+    diagrams .bool_gset:N = \g__pv_diagrams_bool,
+    diagrams .usage:n = load,
+    diagram-font .choices:nn = { sans, body } { \__pv_diagram_font:n {#1} },
+  }
+
+% Diagram text: a little smaller than the body, like figure text; sans by
+% default, as in the Python figures, or the body face.
+\tl_new:N \l__pv_dfont_tl
+\tl_new:N \l__pv_dnote_tl
+\cs_new_protected:Npn \__pv_diagram_font:n #1
+  {
+    \str_if_eq:nnTF {#1} { sans }
+      {
+        \tl_set:Nn \l__pv_dfont_tl { \sffamily \footnotesize }
+        \tl_set:Nn \l__pv_dnote_tl { \sffamily \scriptsize }
+      }
+      {
+        \tl_set:Nn \l__pv_dfont_tl { \footnotesize }
+        \tl_set:Nn \l__pv_dnote_tl { \scriptsize }
+      }
+  }
+
+\tl_const:Nn \c__pv_preset_amber_tl  { E4AE1A }
+\tl_const:Nn \c__pv_preset_blue_tl   { 1A73D5 }
+\tl_const:Nn \c__pv_preset_teal_tl   { 009A9A }
+\tl_const:Nn \c__pv_preset_green_tl  { 2E9E52 }
+\tl_const:Nn \c__pv_preset_red_tl    { DA4339 }
+\tl_const:Nn \c__pv_preset_purple_tl { 8254C4 }
+\tl_const:Nn \c__pv_preset_gray_tl   { 717171 }
+
+% A hex value (with or without #) or any xcolor expression, stored as hex.
+\str_new:N \l__pv_color_str
+\tl_new:N \l__pv_model_tl
+\tl_new:N \l__pv_spec_tl
+\cs_new_protected:Npn \__pv_set_color:Nn #1 #2
+  {
+    \str_set:Ne \l__pv_color_str { \tl_to_str:n {#2} }
+    \exp_args:NNV \str_remove_all:Nn \l__pv_color_str \c_hash_str
+    \str_remove_all:Nn \l__pv_color_str { ~ }
+    \regex_match:nVTF { \A [0-9A-Fa-f]{6} \Z } \l__pv_color_str
+      { \tl_set:Ne #1 { \str_uppercase:f { \l__pv_color_str } } }
+      {
+        \colorlet { pv@probe } {#2}
+        \extractcolorspecs { pv@probe } \l__pv_model_tl \l__pv_spec_tl
+        \convertcolorspec { \l__pv_model_tl } { \l__pv_spec_tl } { HTML } #1
+      }
+  }
+
+% Apply options; derive the colors again when a color option changed. Inside
+% a group (one table, one key) the new colors last until the group ends.
+\cs_new_protected:Npn \__pv_apply:n #1
+  {
+    \bool_set_false:N \l__pv_recolor_bool
+    \keys_set:nn { pubviz } {#1}
+    \bool_if:NT \l__pv_recolor_bool { \__pv_derive: }
+  }
+\cs_generate_variant:Nn \__pv_apply:n { V }
+\NewDocumentCommand \pvsetup { m } { \__pv_apply:n {#1} }
+
+% ======================================================================
+% Color math. Mirror of src/pubviz/color.py: keep the constants equal.
+% ======================================================================
+
+\fp_new:N \l__pv_r_fp
+\fp_new:N \l__pv_g_fp
+\fp_new:N \l__pv_b_fp
+\fp_new:N \l__pv_L_fp
+\fp_new:N \l__pv_C_fp
+\fp_new:N \l__pv_h_fp
+\fp_new:N \l__pv_lo_fp
+\fp_new:N \l__pv_hi_fp
+\fp_new:N \l__pv_mid_fp
+\fp_new:N \l__pv_x_fp
+\fp_new:N \l__pv_y_fp
+\fp_new:N \l__pv_z_fp
+\fp_const:Nn \c__pv_eps_fp { 0.000001 }
+\int_const:Nn \c__pv_bisect_int { 18 }
+\tl_new:N \l__pv_hex_tl
+
+% l3fp evaluates both branches of ?:, so neither branch may fail.
+\cs_new:Npn \__pv_lin:n #1
+  { ( (#1) <= 0.04045 ) ? ( (#1) / 12.92 ) : ( ( ( (#1) + 0.055 ) / 1.055 ) ^ 2.4 ) }
+\cs_new:Npn \__pv_gam:n #1
+  { ( (#1) <= 0.0031308 ) ? ( 12.92 * (#1) ) : ( 1.055 * ( abs (#1) ^ (1/2.4) ) - 0.055 ) }
+\cs_new:Npn \__pv_cbrt:n #1
+  { ( sign (#1) * ( abs (#1) ^ (1/3) ) ) }
+\cs_new:Npn \__pv_hexbyte:Nn #1 #2
+  { ( \exp_args:Ne \int_from_hex:n { \str_range:Nnn #1 {#2} { #2 + 1 } } / 255 ) }
+
+% hex -> \l__pv_L_fp, \l__pv_C_fp, \l__pv_h_fp (radians)
+\cs_new_protected:Npn \__pv_hex_to_oklch:n #1
+  {
+    \str_set:Ne \l__pv_color_str {#1}
+    \fp_set:Nn \l__pv_r_fp { \__pv_lin:n { \__pv_hexbyte:Nn \l__pv_color_str { 1 } } }
+    \fp_set:Nn \l__pv_g_fp { \__pv_lin:n { \__pv_hexbyte:Nn \l__pv_color_str { 3 } } }
+    \fp_set:Nn \l__pv_b_fp { \__pv_lin:n { \__pv_hexbyte:Nn \l__pv_color_str { 5 } } }
+    \fp_set:Nn \l__pv_x_fp
+      {
+        \__pv_cbrt:n
+          { 0.4122214708 * \l__pv_r_fp + 0.5363325363 * \l__pv_g_fp + 0.0514459929 * \l__pv_b_fp }
+      }
+    \fp_set:Nn \l__pv_y_fp
+      {
+        \__pv_cbrt:n
+          { 0.2119034982 * \l__pv_r_fp + 0.6806995451 * \l__pv_g_fp + 0.1073969566 * \l__pv_b_fp }
+      }
+    \fp_set:Nn \l__pv_z_fp
+      {
+        \__pv_cbrt:n
+          { 0.0883024619 * \l__pv_r_fp + 0.2817188376 * \l__pv_g_fp + 0.6299787005 * \l__pv_b_fp }
+      }
+    \fp_set:Nn \l__pv_L_fp
+      { 0.2104542553 * \l__pv_x_fp + 0.7936177850 * \l__pv_y_fp - 0.0040720468 * \l__pv_z_fp }
+    \fp_set:Nn \l__pv_lo_fp
+      { 1.9779984951 * \l__pv_x_fp - 2.4285922050 * \l__pv_y_fp + 0.4505937099 * \l__pv_z_fp }
+    \fp_set:Nn \l__pv_hi_fp
+      { 0.0259040371 * \l__pv_x_fp + 0.7827717662 * \l__pv_y_fp - 0.8086757660 * \l__pv_z_fp }
+    \fp_set:Nn \l__pv_C_fp { sqrt ( \l__pv_lo_fp ^ 2 + \l__pv_hi_fp ^ 2 ) }
+    \fp_compare:nNnTF \l__pv_C_fp > { 0.000001 }
+      { \fp_set:Nn \l__pv_h_fp { atan ( \l__pv_hi_fp , \l__pv_lo_fp ) } }
+      { \fp_set:Nn \l__pv_h_fp { 0 } }
+  }
+
+% (L, C, h) -> linear sRGB in \l__pv_r_fp, \l__pv_g_fp, \l__pv_b_fp
+\cs_new_protected:Npn \__pv_oklch_to_lin:nnn #1 #2 #3
+  {
+    \fp_set:Nn \l__pv_lo_fp { (#2) * cos (#3) }
+    \fp_set:Nn \l__pv_hi_fp { (#2) * sin (#3) }
+    \fp_set:Nn \l__pv_x_fp
+      { ( (#1) + 0.3963377774 * \l__pv_lo_fp + 0.2158037573 * \l__pv_hi_fp ) ^ 3 }
+    \fp_set:Nn \l__pv_y_fp
+      { ( (#1) - 0.1055613458 * \l__pv_lo_fp - 0.0638541728 * \l__pv_hi_fp ) ^ 3 }
+    \fp_set:Nn \l__pv_z_fp
+      { ( (#1) - 0.0894841775 * \l__pv_lo_fp - 1.2914855480 * \l__pv_hi_fp ) ^ 3 }
+    \fp_set:Nn \l__pv_r_fp
+      {  4.0767416621 * \l__pv_x_fp - 3.3077115913 * \l__pv_y_fp + 0.2309699292 * \l__pv_z_fp }
+    \fp_set:Nn \l__pv_g_fp
+      { -1.2684380046 * \l__pv_x_fp + 2.6097574011 * \l__pv_y_fp - 0.3413193965 * \l__pv_z_fp }
+    \fp_set:Nn \l__pv_b_fp
+      { -0.0041960863 * \l__pv_x_fp - 0.7034186147 * \l__pv_y_fp + 1.7076147010 * \l__pv_z_fp }
+  }
+
+\cs_new:Npn \__pv_in_range:N #1
+  { ( #1 >= - \c__pv_eps_fp ) && ( #1 <= 1 + \c__pv_eps_fp ) }
+\prg_new_protected_conditional:Npnn \__pv_in_gamut:nnn #1 #2 #3 { TF }
+  {
+    \__pv_oklch_to_lin:nnn {#1} {#2} {#3}
+    \fp_compare:nTF
+      {
+        \__pv_in_range:N \l__pv_r_fp && \__pv_in_range:N \l__pv_g_fp
+        && \__pv_in_range:N \l__pv_b_fp
+      }
+      { \prg_return_true: } { \prg_return_false: }
+  }
+
+\fp_new:N \l__pv_tL_fp
+\fp_new:N \l__pv_tC_fp
+\fp_new:N \l__pv_th_fp
+\fp_new:N \l__pv_bis_lo_fp
+\fp_new:N \l__pv_bis_hi_fp
+% (L, C, h) -> \l__pv_hex_tl, lowering chroma until sRGB can show the color.
+\cs_new_protected:Npn \__pv_oklch_to_hex:nnn #1 #2 #3
+  {
+    \fp_set:Nn \l__pv_tL_fp {#1}
+    \fp_set:Nn \l__pv_tC_fp {#2}
+    \fp_set:Nn \l__pv_th_fp {#3}
+    \__pv_in_gamut:nnnTF \l__pv_tL_fp \l__pv_tC_fp \l__pv_th_fp
+      { }
+      {
+        \fp_set:Nn \l__pv_bis_lo_fp { 0 }
+        \fp_set_eq:NN \l__pv_bis_hi_fp \l__pv_tC_fp
+        \prg_replicate:nn { \c__pv_bisect_int }
+          {
+            \fp_set:Nn \l__pv_mid_fp { ( \l__pv_bis_lo_fp + \l__pv_bis_hi_fp ) / 2 }
+            \__pv_in_gamut:nnnTF \l__pv_tL_fp \l__pv_mid_fp \l__pv_th_fp
+              { \fp_set_eq:NN \l__pv_bis_lo_fp \l__pv_mid_fp }
+              { \fp_set_eq:NN \l__pv_bis_hi_fp \l__pv_mid_fp }
+          }
+        \fp_set_eq:NN \l__pv_tC_fp \l__pv_bis_lo_fp
+      }
+    \__pv_oklch_to_lin:nnn \l__pv_tL_fp \l__pv_tC_fp \l__pv_th_fp
+    \tl_set:Ne \l__pv_hex_tl
+      {
+        \__pv_byte_hex:n { \__pv_gam:n { \l__pv_r_fp } }
+        \__pv_byte_hex:n { \__pv_gam:n { \l__pv_g_fp } }
+        \__pv_byte_hex:n { \__pv_gam:n { \l__pv_b_fp } }
+      }
+  }
+\cs_new:Npn \__pv_byte_hex:n #1
+  {
+    \exp_args:Ne \__pv_byte_hex_aux:n
+      { \fp_eval:n { trunc ( 255 * max ( 0 , min ( 1 , #1 ) ) + 0.5 ) } }
+  }
+\cs_new:Npn \__pv_byte_hex_aux:n #1
+  { \int_compare:nNnT {#1} < { 16 } { 0 } \int_to_Hex:n {#1} }
+
+% ======================================================================
+% Theme roles. Mirror of derive_roles in src/pubviz/theme.py.
+% ======================================================================
+
+\fp_new:N \l__pv_aL_fp
+\fp_new:N \l__pv_aC_fp
+\fp_new:N \l__pv_ah_fp
+\tl_new:N \l__pv_role_tl
+
+% Define color pv-<name> from (L, C, h).
+\cs_new_protected:Npn \__pv_role:nnnn #1 #2 #3 #4
+  {
+    \__pv_oklch_to_hex:nnn {#2} {#3} {#4}
+    \__pv_role_hex:nV {#1} \l__pv_hex_tl
+  }
+% Define color pv-<name> from a hex value; gray and plain modes keep only
+% the lightness.
+\cs_new_protected:Npn \__pv_role_hex:nn #1 #2
+  {
+    \str_if_eq:VnTF \l__pv_mode_tl { color }
+      { \tl_set:Ne \l__pv_role_tl {#2} }
+      {
+        \__pv_hex_to_oklch:n {#2}
+        \__pv_oklch_to_hex:nnn \l__pv_L_fp { 0 } { 0 }
+        \tl_set_eq:NN \l__pv_role_tl \l__pv_hex_tl
+      }
+    \definecolor { pv-#1 } { HTML } { \l__pv_role_tl }
+    \tl_clear_new:c { l__pv_role_ #1 _tl }
+    \tl_set_eq:cN { l__pv_role_ #1 _tl } \l__pv_role_tl
+  }
+\cs_generate_variant:Nn \__pv_role_hex:nn { nV }
+
+\cs_new_protected:Npn \__pv_derive:
+  {
+    \__pv_hex_to_oklch:n { \l__pv_accent_tl }
+    \fp_set_eq:NN \l__pv_aL_fp \l__pv_L_fp
+    \fp_set_eq:NN \l__pv_aC_fp \l__pv_C_fp
+    \fp_set_eq:NN \l__pv_ah_fp \l__pv_h_fp
+    \__pv_role_hex:nV { accent } \l__pv_accent_tl
+    \__pv_role:nnnn { strong }
+      { max ( 0.42 , min ( 0.66 , \l__pv_aL_fp ) ) } { \l__pv_aC_fp } { \l__pv_ah_fp }
+    % The best fill at 0.85 stays about 10 lightness points from the second in
+    % grey for every preset accent, with black text above a contrast of 12.
+    \__pv_role:nnnn { fill-1 } { 0.850 } { 0.65 * \l__pv_aC_fp } { \l__pv_ah_fp }
+    \__pv_role:nnnn { fill-2 } { 0.955 } { 0.26 * \l__pv_aC_fp } { \l__pv_ah_fp }
+    \__pv_role:nnnn { fill-3 } { 0.978 } { 0.12 * \l__pv_aC_fp } { \l__pv_ah_fp }
+    \__pv_role:nnnn { band } { 0.960 } { 0 } { 0 }
+    \__pv_role:nnnn { muted } { 0.550 } { 0 } { 0 }
+    \__pv_role_hex:nV { pos } \l__pv_pos_tl
+    \__pv_role_hex:nV { neg } \l__pv_neg_tl
+    \int_step_inline:nnn { 0 } { 8 }
+      {
+        \__pv_role:nnnn { heat-##1 }
+          { 0.975 + ( 0.780 - 0.975 ) * ##1 / 8 }
+          { 0.80 * \l__pv_aC_fp * ##1 / 8 }
+          { \l__pv_ah_fp }
+      }
+    % Kinds of block in a diagram, one light fill per kind at the same
+    % lightness: the label names the kind, the fill only helps the eye group
+    % blocks of one kind. Fixed hues, so a kind keeps its color across papers.
+    \__pv_role:nnnn { kind-1 } { 0.920 } { 0.070 } { 55 deg }    % orange
+    \__pv_role:nnnn { kind-2 } { 0.920 } { 0.070 } { 250 deg }   % blue
+    \__pv_role:nnnn { kind-3 } { 0.920 } { 0.070 } { 105 deg }   % yellow
+    \__pv_role:nnnn { kind-4 } { 0.920 } { 0.070 } { 355 deg }   % pink
+    \__pv_role:nnnn { kind-5 } { 0.920 } { 0.070 } { 300 deg }   % purple
+    \__pv_role:nnnn { kind-6 } { 0.920 } { 0.070 } { 150 deg }   % green
+    \bool_if:NT \l__pv_debug_bool { \__pv_log_roles: }
+  }
+\clist_const:Nn \c__pv_roles_clist
+  {
+    accent, strong, fill-1, fill-2, fill-3, band, muted, pos, neg,
+    heat-0, heat-1, heat-2, heat-3, heat-4, heat-5, heat-6, heat-7, heat-8,
+    kind-1, kind-2, kind-3, kind-4, kind-5, kind-6
+  }
+\cs_new_protected:Npn \__pv_log_roles:
+  {
+    \iow_log:e
+      {
+        pubviz~roles~(\l__pv_mode_tl):
+        \clist_map_function:NN \c__pv_roles_clist \__pv_log_role:n
+      }
+  }
+\cs_new:Npn \__pv_log_role:n #1 { \c_space_tl #1 = \tl_use:c { l__pv_role_ #1 _tl } }
+
+% ======================================================================
+% Defaults
+% ======================================================================
+
+% ---- the words of the key, by language
+% Every word and punctuation mark the key writes is a key/ option, so the key
+% can be written in any language. \pvdefinelanguage stores a set of them
+% under a name; language=<name> applies English first and that set on top,
+% so a set may leave words out. Values carry no spaces at their ends:
+% key/spaced says whether words are separated by spaces (English, Korean)
+% or not (Chinese, Japanese).
+\tl_new:N \l__pv_language_tl
+\tl_new:N \l__pv_key_join_tl
+\prop_new:N \g__pv_languages_prop
+\keys_define:nn { pubviz }
+  {
+    key/each-column .tl_set:N = \l__pv_kw_each_column_tl,
+    key/each-row .tl_set:N = \l__pv_kw_each_row_tl,
+    key/lowest .tl_set:N = \l__pv_kw_lowest_tl,
+    key/lowest-mixed .tl_set:N = \l__pv_kw_lowest_mixed_tl,
+    key/ties .tl_set:N = \l__pv_kw_ties_tl,
+    key/second-tied .tl_set:N = \l__pv_kw_second_tied_tl,
+    key/small-numbers .tl_set:N = \l__pv_kw_small_tl,
+    key/signed-numbers .tl_set:N = \l__pv_kw_signed_tl,
+    key/against .tl_set:N = \l__pv_kw_against_tl,
+    key/against-relative .tl_set:N = \l__pv_kw_against_rel_tl,
+    key/after .tl_set:N = \l__pv_kw_after_tl,
+    key/after-relative .tl_set:N = \l__pv_kw_after_rel_tl,
+    key/better .tl_set:N = \l__pv_kw_better_tl,
+    key/worse .tl_set:N = \l__pv_kw_worse_tl,
+    key/or .tl_set:N = \l__pv_kw_or_tl,
+    key/crosses-zero .tl_set:N = \l__pv_kw_crosses_tl,
+    key/shading-column .tl_set:N = \l__pv_kw_heat_column_tl,
+    key/shading-row .tl_set:N = \l__pv_kw_heat_row_tl,
+    key/shading-table .tl_set:N = \l__pv_kw_heat_table_tl,
+    key/open .tl_set:N = \l__pv_kw_open_tl,
+    key/close .tl_set:N = \l__pv_kw_close_tl,
+    key/semicolon .tl_set:N = \l__pv_kw_semicolon_tl,
+    key/colon .tl_set:N = \l__pv_kw_colon_tl,
+    key/comma .tl_set:N = \l__pv_kw_comma_tl,
+    key/spaced .bool_set:N = \l__pv_kw_spaced_bool,
+  }
+\NewDocumentCommand \pvdefinelanguage { m +m }
+  { \prop_gput:Nnn \g__pv_languages_prop {#1} {#2} }
+\cs_generate_variant:Nn \keys_set:nn { nV }
+\cs_new_protected:Npn \__pv_language:n #1
+  {
+    \prop_if_in:NnTF \g__pv_languages_prop {#1}
+      {
+        \tl_set:Nn \l__pv_language_tl {#1}
+        \prop_get:NnN \g__pv_languages_prop { en } \l__pv_key_join_tl
+        \keys_set:nV { pubviz / key } \l__pv_key_join_tl
+        \prop_get:NnN \g__pv_languages_prop {#1} \l__pv_key_join_tl
+        \keys_set:nV { pubviz / key } \l__pv_key_join_tl
+      }
+      { \msg_error:nnn { pubviz } { unknown-language } {#1} }
+  }
+% The space between words, or nothing.
+\cs_new:Npn \__pv_kw_sep: { \bool_if:NT \l__pv_kw_spaced_bool { \c_space_tl } }
+
+\pvdefinelanguage { en }
+  {
+    best = Best, second = Second~best, third = Third~best,
+    missing = not~reported, baseline = the~baseline,
+    each-column = in~each~column, each-row = in~each~row,
+    lowest = lowest, lowest-mixed = lowest~where~lower~is~better,
+    ties = ties~share~a~mark, second-tied = none~when~first~place~is~tied,
+    small-numbers = Small~numbers, signed-numbers = Signed~numbers,
+    against = change~against, against-relative = relative~change~against,
+    after = {}, after-relative = {},
+    better = better, worse = worse, or = or, crosses-zero = interval~crosses~zero,
+    shading-column = Shading~within~each~column, shading-row = Shading~within~each~row,
+    shading-table = Shading~across~the~table,
+    spaced = true, open = (, close = ), semicolon = ;, colon = :, comma = {,},
+  }
+\pvdefinelanguage { zh-tw }
+  {
+    best = 最佳, second = 次佳, third = 第三, missing = 未報告, baseline = 基準,
+    each-column = 每欄, each-row = 每列,
+    lowest = 取最低, lowest-mixed = 越低越好者取最低,
+    ties = 同分共用標記, second-tied = 第一名同分時從缺,
+    small-numbers = 小字, signed-numbers = 數字,
+    against = 相對, against-relative = 相對, after = 的變化, after-relative = 的相對變化,
+    better = 較好, worse = 較差, or = 或, crosses-zero = 區間跨過零,
+    shading-column = 每欄內的底色, shading-row = 每列內的底色, shading-table = 整張表的底色,
+    spaced = false, open = （, close = ）, semicolon = ；, colon = ：, comma = ，,
+  }
+\pvdefinelanguage { zh-cn }
+  {
+    best = 最佳, second = 次佳, third = 第三, missing = 未报告, baseline = 基准,
+    each-column = 每列, each-row = 每行,
+    lowest = 取最低, lowest-mixed = 越低越好者取最低,
+    ties = 并列共用标记, second-tied = 第一名并列时空缺,
+    small-numbers = 小字, signed-numbers = 数字,
+    against = 相对, against-relative = 相对, after = 的变化, after-relative = 的相对变化,
+    better = 较好, worse = 较差, or = 或, crosses-zero = 区间跨过零,
+    shading-column = 每列内的底色, shading-row = 每行内的底色, shading-table = 整张表的底色,
+    spaced = false, open = （, close = ）, semicolon = ；, colon = ：, comma = ，,
+  }
+\pvdefinelanguage { ja }
+  {
+    best = 最良, second = 次点, third = 3位, missing = 報告なし, baseline = ベースライン,
+    each-column = 各列, each-row = 各行,
+    lowest = 最小値, lowest-mixed = 小さいほど良い列は最小値,
+    ties = 同値は同じ印, second-tied = 1位が同値なら該当なし,
+    small-numbers = 小さな数字, signed-numbers = 符号付きの数字,
+    against = {}, against-relative = {}, after = からの変化, after-relative = からの相対変化,
+    better = 良い, worse = 悪い, or = ／, crosses-zero = 区間が0をまたぐ,
+    shading-column = 各列内の濃淡, shading-row = 各行内の濃淡, shading-table = 表全体の濃淡,
+    spaced = false, open = （, close = ）, semicolon = 、, colon = ：, comma = 、,
+  }
+\pvdefinelanguage { ko }
+  {
+    best = 최고, second = 두~번째, third = 세~번째, missing = 보고되지~않음, baseline = 기준,
+    each-column = 각~열, each-row = 각~행,
+    lowest = 최솟값, lowest-mixed = 낮을수록~좋은~열은~최솟값,
+    ties = 동점은~같은~표시, second-tied = 1위가~동점이면~없음,
+    small-numbers = 작은~숫자, signed-numbers = 부호~있는~숫자,
+    against = {}, against-relative = {}, after = 대비~변화, after-relative = 대비~상대~변화,
+    better = 좋음, worse = 나쁨, or = 또는, crosses-zero = 구간이~0을~포함,
+    shading-column = 각~열~안의~음영, shading-row = 각~행~안의~음영, shading-table = 표~전체의~음영,
+    spaced = true, open = (, close = ), semicolon = ;, colon = :, comma = {,},
+  }
+
+\keys_set:nn { pubviz }
+  {
+    theme = amber, pos = 1D7D3E, neg = BD3931, mode = color,
+    layout-file = true,
+    fill = chip, ranks = 2, ties = shared, bold-best = true,
+    underline-second = auto, align = c,
+    chip-hpad = 0.35em, chip-vpad = 0.2em,
+    ours-style = \bfseries,
+    missing = \textendash,
+    delta-size = 0.72, stretch = 1.25,
+    by = column, better = higher, header = auto, label-cols = 1,
+    delta = none, show = both, delta-digits = 1, heat = none,
+    language = en, key/ours = {},
+    diagram-font = sans,
+  }
+\ProcessKeyOptions [ pubviz ]
+\__pv_derive:
+
+% ======================================================================
+% Marks you can use anywhere
+% ======================================================================
+
+\prg_new_conditional:Npnn \__pv_fills_on: { p , T , F , TF }
+  {
+    \bool_lazy_or:nnTF
+      { \str_if_eq_p:Vn \l__pv_mode_tl { plain } }
+      { \str_if_eq_p:Vn \l__pv_fill_tl { none } }
+      { \prg_return_false: } { \prg_return_true: }
+  }
+
+\dim_new:N \l__pv_chip_wd_dim
+\dim_new:N \l__pv_chip_ht_dim
+\dim_new:N \l__pv_chip_dp_dim
+\dim_new:N \l__pv_hpad_dim
+\box_new:N \l__pv_chip_box
+\tl_new:N \l__pv_chipcolor_tl
+
+% A value in a padded box of fixed width, with an optional background.
+% #1: color name (expands to nothing for no fill), #2: inner width or empty
+% for the natural width, #3: content.
+\cs_new_protected:Npn \__pv_chip:nnn #1 #2 #3
+  {
+    % Start a paragraph first, so a chip that opens one stays in the line.
+    \mode_leave_vertical:
+    \tl_set:Ne \l__pv_chipcolor_tl {#1}
+    \hbox_set:Nn \l__pv_chip_box {#3}
+    \dim_set:Nn \l__pv_hpad_dim { \l__pv_hpad_tl }
+    \tl_if_blank:nTF {#2}
+      { \dim_set:Nn \l__pv_chip_wd_dim { \box_wd:N \l__pv_chip_box + 2 \l__pv_hpad_dim } }
+      { \dim_set:Nn \l__pv_chip_wd_dim { #2 + 2 \l__pv_hpad_dim } }
+    \dim_set:Nn \l__pv_chip_dp_dim { \l__pv_vpad_tl }
+    \dim_set:Nn \l__pv_chip_ht_dim
+      { \tex_fontcharht:D \tex_font:D `0 + \l__pv_chip_dp_dim }
+    \tl_if_blank:VF \l__pv_chipcolor_tl
+      {
+        \str_if_eq:VnT \l__pv_fill_tl { cell }
+          { \exp_args:NV \cellcolor \l__pv_chipcolor_tl }
+      }
+    \hbox:n
+      {
+        \tl_if_blank:VF \l__pv_chipcolor_tl
+          {
+            \str_if_eq:VnF \l__pv_fill_tl { cell }
+              {
+                \group_begin:
+                  \color { \l__pv_chipcolor_tl }
+                  \tex_vrule:D
+                    width \l__pv_chip_wd_dim
+                    height \l__pv_chip_ht_dim
+                    depth \l__pv_chip_dp_dim
+                \group_end:
+                \tex_kern:D - \l__pv_chip_wd_dim
+              }
+          }
+        \hbox_to_wd:nn { \l__pv_chip_wd_dim }
+          {
+            \str_if_eq:VnF \l__pv_align_tl { l } { \hfil }
+            \box_use:N \l__pv_chip_box
+            \str_if_eq:VnF \l__pv_align_tl { r } { \hfil }
+          }
+      }
+  }
+
+% #1: rank (1-3), #2: inner width or empty, #3: content.
+\cs_new_protected:Npn \__pv_ranked:nnn #1 #2 #3
+  {
+    \__pv_chip:nnn
+      { \bool_if:nT { \__pv_fills_on_p: && \int_compare_p:nNn {#1} < { 4 } } { pv-fill-#1 } }
+      {#2}
+      { \__pv_rank_font:nn {#1} {#3} }
+  }
+\cs_new_protected:Npn \__pv_rank_font:nn #1 #2
+  {
+    \int_case:nnF {#1}
+      {
+        { 1 }
+          {
+            \bool_if:NTF \l__pv_bold_best_bool
+              { \group_begin: \bfseries \boldmath #2 \group_end: } {#2}
+          }
+        { 2 } { \__pv_underline:TF { \underline {#2} } {#2} }
+      }
+      {#2}
+  }
+
+\prg_new_conditional:Npnn \__pv_underline: { p , TF }
+  {
+    \bool_lazy_or:nnTF
+      { \str_if_eq_p:Vn \l__pv_underline_tl { true } }
+      { \str_if_eq_p:Vn \l__pv_underline_tl { auto } && ! \__pv_fills_on_p: }
+      { \prg_return_true: } { \prg_return_false: }
+  }
+
+\NewDocumentCommand \pvbest   { m } { \__pv_ranked:nnn { 1 } { } {#1} }
+\NewDocumentCommand \pvsecond { m } { \__pv_ranked:nnn { 2 } { } {#1} }
+\NewDocumentCommand \pvthird  { m } { \__pv_ranked:nnn { 3 } { } {#1} }
+\cs_new_protected:Npn \__pv_na: { \group_begin: \color { pv-muted } \l__pv_missing_tl \group_end: }
+\NewDocumentCommand \pvna { } { \__pv_na: }
+
+% \pvheat{t}{content}: t in [0, 1], 1 is the best end.
+\NewDocumentCommand \pvheat { m m }
+  {
+    \__pv_chip:nnn
+      {
+        \bool_if:nT { \__pv_fills_on_p: }
+          { pv-heat- \fp_eval:n { round ( 8 * max ( 0 , min ( 1 , #1 ) ) ) } }
+      }
+      { } {#2}
+  }
+
+% \pvshade{t}{text}: text on a shade of the accent scale, t in [0, 1]
+% (1 darkest), for the weight of each token of a sentence. \pvshade*{t}{text}
+% takes t in [-1, 1]: a tint of pos for positive weights, a tint of neg with
+% a line under it for negative ones, so the sign survives a grey print. In
+% mode=plain, or with fill=none, the text stays plain (the line remains).
+% pv.pvshade in Python writes a whole sentence of these.
+\box_new:N \l__pv_shade_box
+\NewDocumentCommand \pvshade { s m m }
+  {
+    \IfBooleanTF {#1}
+      { \__pv_shade_signed:nn {#2} {#3} }
+      { \__pv_shade:nn { pv-heat- \fp_eval:n { round ( 8 * max ( 0 , min ( 1 , #2 ) ) ) } } {#3} }
+  }
+\cs_new_protected:Npn \__pv_shade:nn #1 #2
+  {
+    \mode_leave_vertical:
+    \__pv_fills_on:TF
+      {
+        \group_begin:
+          \dim_set:Nn \fboxsep { 0.6pt }
+          \colorbox {#1} { \vphantom { Ag } #2 }
+        \group_end:
+      }
+      { #2 }
+  }
+\cs_new_protected:Npn \__pv_shade_signed:nn #1 #2
+  {
+    \fp_compare:nNnTF {#1} < { 0 }
+      {
+        \mode_leave_vertical:
+        \hbox_set:Nn \l__pv_shade_box
+          { \__pv_shade:nn { pv-neg ! \fp_eval:n { round ( 45 * min ( 1 , - ( #1 ) ) ) } ! white } {#2} }
+        \group_begin:
+          \color { pv-neg }
+          \hbox_overlap_right:n
+            {
+              \tex_vrule:D
+                width \box_wd:N \l__pv_shade_box
+                height \dim_eval:n { - \box_dp:N \l__pv_shade_box - 0.3pt }
+                depth \dim_eval:n { \box_dp:N \l__pv_shade_box + 0.8pt }
+            }
+        \group_end:
+        \box_use:N \l__pv_shade_box
+      }
+      { \__pv_shade:nn { pv-pos ! \fp_eval:n { round ( 45 * min ( 1 , #1 ) ) } ! white } {#2} }
+  }
+
+% A signed change. #1: 1 helps, -1 hurts, 0 neither; #2: text with sign.
+\cs_new_protected:Npn \__pv_delta_text:nn #1 #2
+  {
+    \group_begin:
+      \str_if_eq:VnF \l__pv_mode_tl { plain }
+        {
+          \int_case:nn {#1}
+            {
+              { 1 } { \color { pv-pos } }
+              { -1 } { \color { pv-neg } }
+              { 0 } { \color { pv-muted } }
+            }
+        }
+      #2
+    \group_end:
+  }
+\cs_new_protected:Npn \__pv_delta_small:nn #1 #2
+  {
+    \group_begin:
+      \fontsize { \fp_eval:n { \l__pv_delta_size_tl * \f@size } } { \f@baselineskip }
+      \selectfont
+      \__pv_delta_text:nn {#1} {#2}
+    \group_end:
+  }
+
+% \pvdelta[higher|lower]{+2.3}: color from the sign and the better direction.
+\int_new:N \l__pv_sign_int
+\NewDocumentCommand \pvdelta { O{higher} m }
+  {
+    \__pv_sign_of:n {#2}
+    \str_if_eq:nnT {#1} { lower } { \int_set:Nn \l__pv_sign_int { - \l__pv_sign_int } }
+    \__pv_delta_text:nn { \l__pv_sign_int } {#2}
+  }
+\cs_new_protected:Npn \__pv_sign_of:n #1
+  {
+    \regex_match:nnTF { \A \s* \$? \s* (?: \- | \c{textminus} ) } {#1}
+      { \int_set:Nn \l__pv_sign_int { -1 } }
+      {
+        \regex_match:nnTF { \A \s* \$? \s* \+ } {#1}
+          { \int_set:Nn \l__pv_sign_int { 1 } }
+          { \int_set:Nn \l__pv_sign_int { 0 } }
+      }
+  }
+
+% Markers. Put them where a method or a metric is named.
+\NewDocumentCommand \pvours { } { \l__pv_ours_style_tl }
+\NewDocumentCommand \pvbaseline { } { }
+\NewDocumentCommand \pvnorank { } { }
+\NewDocumentCommand \pvup { } { \ensuremath { \uparrow } }
+\NewDocumentCommand \pvdown { } { \ensuremath { \downarrow } }
+
+% A row label with a second, smaller grey line under it.
+\NewDocumentCommand \pvlabel { O{l} m m }
+  {
+    \begin{tabular} [c] { @{} #1 @{} }
+      #2 \\ [-0.15em]
+      { \footnotesize \color { pv-muted } #3 }
+    \end{tabular}
+  }
+
+% A full-width section row. Inside pvtable write \pvsection{title}.
+\cs_new:Npn \__pv_section_row:nn #1 #2
+  {
+    \str_if_eq:VnF \l__pv_mode_tl { plain } { \rowcolor { pv-band } }
+    \multicolumn {#1} { l } { \__pv_section_font: #2 }
+  }
+\cs_new_protected:Npn \__pv_section_font:
+  { \str_if_eq:VnTF \l__pv_mode_tl { plain } { \itshape } { \bfseries } }
+\cs_new:Npn \pvsectionrow #1 #2 { \__pv_section_row:nn {#1} {#2} }
+\NewDocumentCommand \pvsection { m } { \msg_error:nn { pubviz } { section-outside } }
+
+% ======================================================================
+% pvtable: parse, compare, typeset
+% ======================================================================
+
+\tl_new:N \l__pv_body_tl
+\tl_new:N \l__pv_row_tl
+\tl_new:N \l__pv_cell_tl
+\tl_new:N \l__pv_out_tl
+\tl_new:N \l__pv_key_tl
+\tl_new:N \l__pv_tmp_tl
+\tl_new:N \l__pv_tmpb_tl
+\tl_new:N \l__pv_dir_tl
+\tl_new:N \l__pv_flags_tl
+\tl_new:N \l__pv_num_tl
+\seq_new:N \l__pv_rows_seq
+\seq_new:N \l__pv_cells_seq
+\seq_new:N \l__pv_match_seq
+\seq_new:N \l__pv_vals_seq
+\seq_new:N \l__pv_distinct_seq
+\int_new:N \l__pv_nrows_int
+\int_new:N \l__pv_ncols_int
+\int_new:N \l__pv_hrows_int
+\int_new:N \l__pv_c_int
+\int_new:N \l__pv_span_int
+\int_new:N \l__pv_rank_int
+\int_new:N \l__pv_dec_int
+\int_new:N \l__pv_base_int
+\int_new:N \l__pv_sgn_int
+\int_new:N \g__pv_table_int
+\prop_new:N \l__pv_cell_prop   % "r,c" -> trimmed content
+\prop_new:N \l__pv_span_prop   % "r,c" -> columns spanned
+\prop_new:N \l__pv_cols_prop   % r -> clist of start columns
+\prop_new:N \l__pv_end_prop    % r -> tokens that end the row
+\prop_new:N \l__pv_kind_prop   % "r,c" -> n number | m missing | t text | l label | h header | s section
+\prop_new:N \l__pv_val_prop    % "r,c" -> value
+\prop_new:N \l__pv_dec_prop    % "r,c" -> decimals as typed
+\prop_new:N \l__pv_rank_prop   % "r,c" -> rank
+\prop_new:N \l__pv_dtxt_prop   % "r,c" -> {sign class}{change text}
+\prop_new:N \l__pv_heat_prop   % "r,c" -> heat step 0-8
+\prop_new:N \l__pv_flag_prop   % entity -> o (ours) b (baseline) x (not ranked)
+\prop_new:N \l__pv_dirs_prop   % group -> higher | lower
+\prop_new:N \l__pv_wd_prop     % c -> widest formatted value
+\box_new:N \l__pv_tmp_box
+\fp_new:N \l__pv_v_fp
+\fp_new:N \l__pv_w_fp
+\fp_new:N \l__pv_min_fp
+\fp_new:N \l__pv_max_fp
+
+% A number, optionally signed and inside $...$, optionally followed by \%
+% or by \pm and a spread. Anything else is text and is left alone; wrap a
+% number in braces to keep it out of the comparison.
+\regex_const:Nn \c__pv_number_regex
+  { \A \s* \$? \s* ([\+\-]?) \s* ( \d+ (?: \. \d* )? | \. \d+ ) (.*) \Z }
+\regex_const:Nn \c__pv_tail_regex
+  { \A \s* (?: \c{\%} )? \s* \$? \s* (?: (?: \c{pm} | \c{textpm} ) .* )? \Z }
+\regex_const:Nn \c__pv_missing_regex
+  { \A \s* (?: \-{1,3} | [nN] / [aA] | \c{pvna} | \c{textendash} | \c{textemdash} ) \s* \Z }
+\regex_const:Nn \c__pv_mc_regex
+  { \c{multicolumn} \s* \cB. \s* (\d+) \s* \cE. }
+
+\cs_new:Npn \__pv_key:nn #1 #2 { \int_eval:n {#1} , \int_eval:n {#2} }
+
+\NewDocumentEnvironment { pvtable } { O{} m +b }
+  {
+    \__pv_apply:n {#1}
+    \int_gincr:N \g__pv_table_int
+    \__pv_key_reset:n {#1}
+    % Raise the brace level while the body is taken apart, so that an outer
+    % alignment (pvtable inside a tabular cell) does not act on its & and \\.
+    \if_false: { \fi:
+    \__pv_parse:n {#3}
+    \__pv_classify:
+    \__pv_markers:
+    \__pv_key_note_ours:
+    \__pv_rank:
+    \__pv_deltas:
+    \prop_if_empty:NF \l__pv_dtxt_prop { \bool_gset_true:N \g__pv_key_delta_bool }
+    \__pv_heat:
+    \prop_if_empty:NF \l__pv_heat_prop { \bool_gset_true:N \g__pv_key_heat_bool }
+    \__pv_measure:
+    \__pv_emit:
+    \if_false: } \fi:
+    \cs_set:Npe \pvsection ##1
+      { \exp_not:N \__pv_section_row:nn { \int_use:N \l__pv_ncols_int } {##1} }
+    \tl_if_blank:VF \l__pv_stretch_tl
+      { \cs_set:Npe \arraystretch { \l__pv_stretch_tl } }
+    \begin{tabular} {#2}
+      \tl_use:N \l__pv_out_tl
+    \end{tabular}
+  }
+  { }
+
+% ---- 1. split into rows and cells
+\cs_new_protected:Npn \__pv_parse:n #1
+  {
+    \prop_clear:N \l__pv_cell_prop
+    \prop_clear:N \l__pv_span_prop
+    \prop_clear:N \l__pv_cols_prop
+    \prop_clear:N \l__pv_end_prop
+    \tl_set:Nn \l__pv_body_tl {#1}
+    \tl_replace_all:Nnn \l__pv_body_tl { \tabularnewline } { \\ }
+    \seq_set_split_keep_spaces:NnV \l__pv_rows_seq { \\ } \l__pv_body_tl
+    \int_zero:N \l__pv_nrows_int
+    \int_zero:N \l__pv_ncols_int
+    \seq_map_indexed_inline:Nn \l__pv_rows_seq
+      {
+        \tl_set:Ne \l__pv_row_tl { \tl_trim_spaces:n {##2} }
+        % "\\[2pt]" leaves "[2pt]" at the start of the next piece.
+        \int_compare:nNnT {##1} > { 1 }
+          {
+            \tl_if_head_eq_charcode:VNT \l__pv_row_tl [
+              { \exp_after:wN \__pv_take_opt:w \l__pv_row_tl \q_stop }
+          }
+        \int_incr:N \l__pv_nrows_int
+        \prop_put:Nen \l__pv_end_prop { \int_use:N \l__pv_nrows_int } { \\ }
+        \__pv_split_row:
+      }
+    % The last piece was not followed by \\.
+    \prop_put:Nen \l__pv_end_prop { \int_use:N \l__pv_nrows_int } { }
+  }
+\cs_new_protected:Npn \__pv_take_opt:w [ #1 ] #2 \q_stop
+  {
+    \prop_put:Nen \l__pv_end_prop { \int_use:N \l__pv_nrows_int } { \\ [#1] }
+    \tl_set:Ne \l__pv_row_tl { \tl_trim_spaces:n {#2} }
+  }
+
+\cs_new_protected:Npn \__pv_split_row:
+  {
+    \seq_set_split_keep_spaces:NnV \l__pv_cells_seq { & } \l__pv_row_tl
+    \int_set:Nn \l__pv_c_int { 1 }
+    \tl_clear:N \l__pv_tmp_tl
+    \seq_map_inline:Nn \l__pv_cells_seq
+      {
+        \tl_set:Ne \l__pv_cell_tl { \tl_trim_spaces:n {##1} }
+        \int_set:Nn \l__pv_span_int { 1 }
+        \regex_extract_once:NVNT \c__pv_mc_regex \l__pv_cell_tl \l__pv_match_seq
+          { \int_set:Nn \l__pv_span_int { \seq_item:Nn \l__pv_match_seq { 2 } } }
+        \tl_set:Ne \l__pv_key_tl { \__pv_key:nn \l__pv_nrows_int \l__pv_c_int }
+        \prop_put:NVV \l__pv_cell_prop \l__pv_key_tl \l__pv_cell_tl
+        \prop_put:NVe \l__pv_span_prop \l__pv_key_tl { \int_use:N \l__pv_span_int }
+        \tl_put_right:Ne \l__pv_tmp_tl
+          { \tl_if_empty:NF \l__pv_tmp_tl { , } \int_use:N \l__pv_c_int }
+        \int_add:Nn \l__pv_c_int { \l__pv_span_int }
+      }
+    \prop_put:NeV \l__pv_cols_prop { \int_use:N \l__pv_nrows_int } \l__pv_tmp_tl
+    \int_set:Nn \l__pv_ncols_int { \int_max:nn \l__pv_ncols_int { \l__pv_c_int - 1 } }
+  }
+
+\cs_new:Npn \__pv_cell:nn #1 #2
+  { \prop_item:Ne \l__pv_cell_prop { \__pv_key:nn {#1} {#2} } }
+\cs_new:Npn \__pv_kind:nn #1 #2
+  { \prop_item:Ne \l__pv_kind_prop { \__pv_key:nn {#1} {#2} } }
+\cs_new:Npn \__pv_val:nn #1 #2
+  { \prop_item:Ne \l__pv_val_prop { \__pv_key:nn {#1} {#2} } }
+
+% Run #2 for each start column of row #1, as ##1.
+\cs_new_protected:Npn \__pv_row_cols:nn #1 #2
+  {
+    \prop_get:NeNT \l__pv_cols_prop { \int_eval:n {#1} } \l__pv_tmpb_tl
+      { \clist_map_inline:Nn \l__pv_tmpb_tl {#2} }
+  }
+
+% Is column #2 inside a cell of row #1? The cell's start column goes to
+% \l__pv_tmp_tl.
+\prg_new_protected_conditional:Npnn \__pv_covering:nn #1 #2 { T , TF }
+  {
+    \tl_clear:N \l__pv_tmp_tl
+    \prop_get:NeNT \l__pv_cols_prop { \int_eval:n {#1} } \l__pv_tmpb_tl
+      {
+        \clist_map_inline:Nn \l__pv_tmpb_tl
+          {
+            \int_compare:nT
+              {
+                ##1 <= #2 <
+                ##1 + \prop_item:Ne \l__pv_span_prop { \__pv_key:nn {#1} {##1} }
+              }
+              { \tl_set:Nn \l__pv_tmp_tl {##1} \clist_map_break: }
+          }
+      }
+    \tl_if_empty:NTF \l__pv_tmp_tl { \prg_return_false: } { \prg_return_true: }
+  }
+
+% ---- 2. what each cell is
+\cs_new_protected:Npn \__pv_classify:
+  {
+    \prop_clear:N \l__pv_kind_prop
+    \prop_clear:N \l__pv_val_prop
+    \prop_clear:N \l__pv_dec_prop
+    % Header rows: everything above the first \midrule or \hline after row 1.
+    \str_if_eq:VnTF \l__pv_header_tl { auto }
+      {
+        \int_zero:N \l__pv_hrows_int
+        \int_step_inline:nnn { 2 } { \l__pv_nrows_int }
+          {
+            \int_compare:nNnT \l__pv_hrows_int = { 0 }
+              {
+                \tl_set:Ne \l__pv_tmp_tl { \__pv_cell:nn {##1} { 1 } }
+                \tl_if_in:NnT \l__pv_tmp_tl { \midrule }
+                  { \int_set:Nn \l__pv_hrows_int { ##1 - 1 } }
+                \tl_if_in:NnT \l__pv_tmp_tl { \hline }
+                  { \int_set:Nn \l__pv_hrows_int { ##1 - 1 } }
+              }
+          }
+      }
+      { \int_set:Nn \l__pv_hrows_int { \l__pv_header_tl } }
+    \int_step_inline:nn { \l__pv_nrows_int }
+      {
+        \__pv_row_cols:nn {##1}
+          {
+            \tl_set:Ne \l__pv_key_tl { \__pv_key:nn {##1} {####1} }
+            \tl_set:Ne \l__pv_cell_tl { \prop_item:NV \l__pv_cell_prop \l__pv_key_tl }
+            \__pv_classify_cell:nn {##1} {####1}
+          }
+      }
+  }
+
+\cs_new_protected:Npn \__pv_classify_cell:nn #1 #2
+  {
+    \tl_if_in:NnTF \l__pv_cell_tl { \pvsection }
+      { \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { s } }
+      {
+        \int_compare:nNnTF {#1} > \l__pv_hrows_int
+          {
+            \int_compare:nNnTF {#2} > \l__pv_label_cols_int
+              { \__pv_classify_value: }
+              { \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { l } }
+          }
+          { \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { h } }
+      }
+  }
+\cs_new_protected:Npn \__pv_classify_value:
+  {
+    \regex_match:NVTF \c__pv_missing_regex \l__pv_cell_tl
+      {
+        \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { m }
+        \bool_gset_true:N \g__pv_key_missing_bool
+      }
+      {
+        \regex_extract_once:NVNTF \c__pv_number_regex \l__pv_cell_tl \l__pv_match_seq
+          {
+            \tl_set:Ne \l__pv_tmp_tl { \seq_item:Nn \l__pv_match_seq { 4 } }
+            \regex_match:NVTF \c__pv_tail_regex \l__pv_tmp_tl
+              {
+                \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { n }
+                \tl_set:Ne \l__pv_tmp_tl { \seq_item:Nn \l__pv_match_seq { 3 } }
+                \prop_put:NVe \l__pv_val_prop \l__pv_key_tl
+                  { \fp_eval:n { \seq_item:Nn \l__pv_match_seq { 2 } ( \l__pv_tmp_tl ) } }
+                \__pv_decimals:V \l__pv_tmp_tl
+                \prop_put:NVe \l__pv_dec_prop \l__pv_key_tl { \int_use:N \l__pv_dec_int }
+              }
+              { \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { t } }
+          }
+          { \prop_put:NVn \l__pv_kind_prop \l__pv_key_tl { t } }
+      }
+  }
+
+\cs_new_protected:Npn \__pv_decimals:n #1
+  {
+    \tl_if_in:nnTF {#1} { . }
+      { \__pv_decimals_aux:w #1 \q_stop }
+      { \int_zero:N \l__pv_dec_int }
+  }
+\cs_new_protected:Npn \__pv_decimals_aux:w #1 . #2 \q_stop
+  { \int_set:Nn \l__pv_dec_int { \tl_count:n {#2} } }
+\cs_generate_variant:Nn \__pv_decimals:n { V }
+
+% Methods and metrics.
+%   by=column: each column is a metric, named in the header; each row is a
+%              method, named in the label column.
+%   by=row:    each row is a metric, named in the label column; each column
+%              is a method, named in the header.
+% An arrow (\uparrow, \downarrow, \pvup, \pvdown) where a metric is named sets
+% its direction. \pvours, \pvbaseline and \pvnorank where a method is named
+% mark that method.
+\cs_new_protected:Npn \__pv_markers:
+  {
+    \prop_clear:N \l__pv_flag_prop
+    \prop_clear:N \l__pv_dirs_prop
+    \int_step_inline:nn { \l__pv_ncols_int }
+      {
+        \tl_clear:N \l__pv_dir_tl
+        \tl_clear:N \l__pv_flags_tl
+        \int_step_inline:nn { \l__pv_hrows_int }
+          {
+            \__pv_covering:nnT {####1} {##1}
+              {
+                \tl_set:Ne \l__pv_cell_tl { \__pv_cell:nn {####1} { \l__pv_tmp_tl } }
+                \__pv_scan:N \l__pv_cell_tl
+              }
+          }
+        \str_if_eq:VnTF \l__pv_by_tl { column }
+          {
+            \prop_put:Nne \l__pv_dirs_prop {##1}
+              { \tl_if_empty:NTF \l__pv_dir_tl { \l__pv_better_tl } { \l__pv_dir_tl } }
+          }
+          { \prop_put:NnV \l__pv_flag_prop {##1} \l__pv_flags_tl }
+      }
+    \int_step_inline:nnn { \l__pv_hrows_int + 1 } { \l__pv_nrows_int }
+      {
+        \tl_clear:N \l__pv_dir_tl
+        \tl_clear:N \l__pv_flags_tl
+        \int_step_inline:nn { \l__pv_label_cols_int }
+          {
+            \tl_set:Ne \l__pv_cell_tl { \__pv_cell:nn {##1} {####1} }
+            \__pv_scan:N \l__pv_cell_tl
+          }
+        \str_if_eq:VnTF \l__pv_by_tl { row }
+          {
+            \prop_put:Nne \l__pv_dirs_prop {##1}
+              { \tl_if_empty:NTF \l__pv_dir_tl { \l__pv_better_tl } { \l__pv_dir_tl } }
+          }
+          { \prop_put:NnV \l__pv_flag_prop {##1} \l__pv_flags_tl }
+      }
+  }
+\cs_new_protected:Npn \__pv_scan:N #1
+  {
+    \tl_if_in:NnT #1 { \downarrow } { \tl_set:Nn \l__pv_dir_tl { lower } }
+    \tl_if_in:NnT #1 { \pvdown } { \tl_set:Nn \l__pv_dir_tl { lower } }
+    \tl_if_in:NnT #1 { \uparrow } { \tl_set:Nn \l__pv_dir_tl { higher } }
+    \tl_if_in:NnT #1 { \pvup } { \tl_set:Nn \l__pv_dir_tl { higher } }
+    \tl_if_in:NnT #1 { \pvours } { \tl_put_right:Nn \l__pv_flags_tl { o } }
+    \tl_if_in:NnT #1 { \pvbaseline } { \tl_put_right:Nn \l__pv_flags_tl { b } }
+    \tl_if_in:NnT #1 { \pvnorank } { \tl_put_right:Nn \l__pv_flags_tl { x } }
+  }
+
+\cs_new:Npn \__pv_entity:nn #1 #2
+  { \str_if_eq:VnTF \l__pv_by_tl { column } {#1} {#2} }
+\cs_new:Npn \__pv_ngroups:
+  { \str_if_eq:VnTF \l__pv_by_tl { column } { \l__pv_ncols_int } { \l__pv_nrows_int } }
+\cs_new:Npn \__pv_first_group:
+  {
+    \str_if_eq:VnTF \l__pv_by_tl { column }
+      { \l__pv_label_cols_int + 1 } { \l__pv_hrows_int + 1 }
+  }
+\prg_new_protected_conditional:Npnn \__pv_flag:nn #1 #2 { T , F , TF }
+  {
+    \tl_set:Ne \l__pv_tmp_tl { \prop_item:Ne \l__pv_flag_prop {#1} }
+    \tl_if_in:NnTF \l__pv_tmp_tl {#2} { \prg_return_true: } { \prg_return_false: }
+  }
+
+% Run #2 for each number in group #1 that takes part in ranking (not marked
+% \pvnorank), with its row and column as ##1 and ##2.
+\cs_new_protected:Npn \__pv_map_body:nn #1 #2 { }
+\cs_new_protected:Npn \__pv_map_group:nn #1 #2
+  {
+    \cs_set_protected:Npn \__pv_map_body:nn ##1 ##2 {#2}
+    \str_if_eq:VnTF \l__pv_by_tl { column }
+      {
+        \int_step_inline:nnn { \l__pv_hrows_int + 1 } { \l__pv_nrows_int }
+          { \__pv_map_cell:nn {##1} {#1} }
+      }
+      {
+        \int_step_inline:nnn { \l__pv_label_cols_int + 1 } { \l__pv_ncols_int }
+          { \__pv_map_cell:nn {#1} {##1} }
+      }
+  }
+\bool_new:N \l__pv_all_bool
+\cs_new_protected:Npn \__pv_map_cell:nn #1 #2
+  {
+    \str_if_eq:eeT { \__pv_kind:nn {#1} {#2} } { n }
+      {
+        \bool_if:NTF \l__pv_all_bool
+          { \__pv_map_body:nn {#1} {#2} }
+          {
+            \__pv_flag:nnF { \__pv_entity:nn {#1} {#2} } { x }
+              { \__pv_map_body:nn {#1} {#2} }
+          }
+      }
+  }
+% The same over every number, \pvnorank included.
+\cs_new_protected:Npn \__pv_map_all:nn #1 #2
+  {
+    \bool_set_true:N \l__pv_all_bool
+    \__pv_map_group:nn {#1} {#2}
+    \bool_set_false:N \l__pv_all_bool
+  }
+
+% ---- 3. ranks
+% shared: values tied for best are all best and the next value is third
+%         ("1, 1, 3"), the usual sports ranking.
+% dense:  the next value after a tie is second ("1, 1, 2").
+\cs_new_protected:Npn \__pv_rank:
+  {
+    \prop_clear:N \l__pv_rank_prop
+    \int_compare:nNnT \l__pv_ranks_int > { 0 }
+      {
+        \int_step_inline:nnn { \__pv_first_group: } { \__pv_ngroups: }
+          {
+            \tl_set:Ne \l__pv_dir_tl { \prop_item:Nn \l__pv_dirs_prop {##1} }
+            \seq_clear:N \l__pv_vals_seq
+            \__pv_map_group:nn {##1}
+              { \seq_put_right:Ne \l__pv_vals_seq { \__pv_val:nn {####1} {####2} } }
+            \seq_set_eq:NN \l__pv_distinct_seq \l__pv_vals_seq
+            \seq_remove_duplicates:N \l__pv_distinct_seq
+            \str_if_eq:VnT \l__pv_ties_tl { dense }
+              { \seq_set_eq:NN \l__pv_vals_seq \l__pv_distinct_seq }
+            % Nothing to mark when every value in the group is the same.
+            \int_compare:nNnT { \seq_count:N \l__pv_distinct_seq } > { 1 }
+              {
+                \prop_clear:N \l__pv_count_prop
+                \__pv_map_group:nn {##1} { \__pv_rank_cell:nn {####1} {####2} }
+                \__pv_key_note_group:
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__pv_rank_cell:nn #1 #2
+  {
+    \fp_set:Nn \l__pv_v_fp { \__pv_val:nn {#1} {#2} }
+    \int_set:Nn \l__pv_rank_int { 1 }
+    \str_if_eq:VnTF \l__pv_dir_tl { lower }
+      {
+        \seq_map_inline:Nn \l__pv_vals_seq
+          { \fp_compare:nNnT {##1} < \l__pv_v_fp { \int_incr:N \l__pv_rank_int } }
+      }
+      {
+        \seq_map_inline:Nn \l__pv_vals_seq
+          { \fp_compare:nNnT {##1} > \l__pv_v_fp { \int_incr:N \l__pv_rank_int } }
+      }
+    \int_compare:nNnF \l__pv_rank_int > { \int_min:nn { \l__pv_ranks_int } { 3 } }
+      {
+        \prop_put:Nee \l__pv_rank_prop { \__pv_key:nn {#1} {#2} }
+          { \int_use:N \l__pv_rank_int }
+        \prop_put:Nee \l__pv_count_prop { \int_use:N \l__pv_rank_int }
+          {
+            \int_eval:n
+              { 0 \prop_item:Ne \l__pv_count_prop { \int_use:N \l__pv_rank_int } + 1 }
+          }
+      }
+    \bool_if:NT \l__pv_debug_bool
+      {
+        \iow_log:e
+          {
+            pubviz~rank:~table~\int_use:N \g__pv_table_int \c_space_tl
+            row~#1~col~#2~value~\fp_use:N \l__pv_v_fp
+            \c_space_tl rank~\int_use:N \l__pv_rank_int
+            \c_space_tl (\l__pv_dir_tl)
+          }
+      }
+  }
+
+% ---- 4. changes against the baseline
+\cs_new_protected:Npn \__pv_deltas:
+  {
+    \prop_clear:N \l__pv_dtxt_prop
+    \str_if_eq:VnF \l__pv_delta_tl { none }
+      {
+        \int_zero:N \l__pv_base_int
+        \prop_map_inline:Nn \l__pv_flag_prop
+          {
+            \tl_if_in:nnT {##2} { b }
+              {
+                \int_compare:nNnT \l__pv_base_int = { 0 }
+                  { \int_set:Nn \l__pv_base_int {##1} }
+              }
+          }
+        \int_compare:nNnTF \l__pv_base_int = { 0 }
+          { \msg_warning:nnV { pubviz } { no-baseline } \l__pv_delta_tl }
+          {
+            \int_step_inline:nnn { \__pv_first_group: } { \__pv_ngroups: }
+              {
+                \tl_set:Ne \l__pv_dir_tl { \prop_item:Nn \l__pv_dirs_prop {##1} }
+                \tl_set:Ne \l__pv_tmpb_tl
+                  {
+                    \str_if_eq:VnTF \l__pv_by_tl { column }
+                      { \__pv_key:nn \l__pv_base_int {##1} }
+                      { \__pv_key:nn {##1} \l__pv_base_int }
+                  }
+                \str_if_eq:eeT { \prop_item:NV \l__pv_kind_prop \l__pv_tmpb_tl } { n }
+                  {
+                    \fp_set:Nn \l__pv_w_fp { \prop_item:NV \l__pv_val_prop \l__pv_tmpb_tl }
+                    \__pv_map_all:nn {##1}
+                      {
+                        \int_compare:nNnF
+                          { \__pv_entity:nn {####1} {####2} } = \l__pv_base_int
+                          { \__pv_delta_cell:nn {####1} {####2} }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+\cs_new_protected:Npn \__pv_delta_cell:nn #1 #2
+  {
+    \fp_set:Nn \l__pv_v_fp { \__pv_val:nn {#1} {#2} }
+    \str_if_eq:VnTF \l__pv_delta_tl { relative }
+      {
+        \fp_compare:nNnTF \l__pv_w_fp = { 0 }
+          { \fp_set:Nn \l__pv_x_fp { nan } }
+          {
+            \fp_set:Nn \l__pv_x_fp
+              { ( \l__pv_v_fp - \l__pv_w_fp ) / abs ( \l__pv_w_fp ) * 100 }
+            \int_set_eq:NN \l__pv_dec_int \l__pv_delta_digits_int
+          }
+      }
+      {
+        \fp_set:Nn \l__pv_x_fp { \l__pv_v_fp - \l__pv_w_fp }
+        \int_set:Nn \l__pv_dec_int
+          {
+            \int_max:nn
+              { \prop_item:Ne \l__pv_dec_prop { \__pv_key:nn {#1} {#2} } }
+              { \prop_item:NV \l__pv_dec_prop \l__pv_tmpb_tl }
+          }
+      }
+    \fp_if_nan:nF { \l__pv_x_fp } { \__pv_delta_store:nn {#1} {#2} }
+  }
+% The minus of a change: the math minus, which every math font has (text
+% fonts such as newtxtext lack \textminus, and LaTeX then borrows another
+% family) and which turns bold with the best value's \boldmath.
+\cs_new_protected:Npn \__pv_minus: { \ensuremath { - } }
+\cs_new_protected:Npn \__pv_delta_store:nn #1 #2
+  {
+    \fp_set:Nn \l__pv_x_fp { round ( \l__pv_x_fp , \l__pv_dec_int ) }
+    \int_set:Nn \l__pv_sgn_int { \fp_eval:n { sign ( \l__pv_x_fp ) } }
+    \str_if_eq:VnT \l__pv_dir_tl { lower }
+      { \int_set:Nn \l__pv_sgn_int { - \l__pv_sgn_int } }
+    \tl_set:Ne \l__pv_num_tl
+      {
+        \fp_compare:nNnTF \l__pv_x_fp > { 0 } { + }
+          { \fp_compare:nNnT \l__pv_x_fp < { 0 } { \exp_not:N \__pv_minus: } }
+        \__pv_fixed:nn { abs ( \l__pv_x_fp ) } { \l__pv_dec_int }
+        \str_if_eq:VnT \l__pv_delta_tl { relative } { \exp_not:N \% }
+      }
+    \prop_put:Nee \l__pv_dtxt_prop { \__pv_key:nn {#1} {#2} }
+      { { \int_use:N \l__pv_sgn_int } { \exp_not:V \l__pv_num_tl } }
+  }
+
+% #1 written with exactly #2 decimals (expandable).
+\cs_new:Npn \__pv_fixed:nn #1 #2
+  {
+    \exp_args:Nee \__pv_fixed_aux:nn
+      { \fp_eval:n { round ( #1 , #2 ) } } { \int_eval:n {#2} }
+  }
+\cs_new:Npn \__pv_fixed_aux:nn #1 #2 { \__pv_fixed_split:w #1 . . \q_mark #2 \q_stop }
+% "2.3" + ". ." splits as 2 | 3 | .  and "2" + ". ." as 2 | (empty) | (empty).
+\cs_new:Npn \__pv_fixed_split:w #1 . #2 . #3 \q_mark #4 \q_stop
+  {
+    #1
+    \int_compare:nNnT {#4} > { 0 }
+      { . #2 \prg_replicate:nn { #4 - \str_count:n {#2} } { 0 } }
+  }
+
+% ---- 5. heat
+\cs_new_protected:Npn \__pv_heat:
+  {
+    \prop_clear:N \l__pv_heat_prop
+    \str_if_eq:VnF \l__pv_heat_tl { none }
+      {
+        \str_if_eq:VnTF \l__pv_heat_tl { table }
+          {
+            \fp_set:Nn \l__pv_min_fp { inf }
+            \fp_set:Nn \l__pv_max_fp { -inf }
+            \int_step_inline:nnn { \__pv_first_group: } { \__pv_ngroups: }
+              { \__pv_map_group:nn {##1} { \__pv_minmax:nn {####1} {####2} } }
+            \tl_set_eq:NN \l__pv_dir_tl \l__pv_better_tl
+            \int_step_inline:nnn { \__pv_first_group: } { \__pv_ngroups: }
+              { \__pv_map_group:nn {##1} { \__pv_heat_cell:nn {####1} {####2} } }
+          }
+          {
+            \int_step_inline:nnn { \__pv_first_group: } { \__pv_ngroups: }
+              {
+                \fp_set:Nn \l__pv_min_fp { inf }
+                \fp_set:Nn \l__pv_max_fp { -inf }
+                \__pv_map_group:nn {##1} { \__pv_minmax:nn {####1} {####2} }
+                \tl_set:Ne \l__pv_dir_tl { \prop_item:Nn \l__pv_dirs_prop {##1} }
+                \__pv_map_group:nn {##1} { \__pv_heat_cell:nn {####1} {####2} }
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__pv_minmax:nn #1 #2
+  {
+    \fp_set:Nn \l__pv_min_fp { min ( \l__pv_min_fp , \__pv_val:nn {#1} {#2} ) }
+    \fp_set:Nn \l__pv_max_fp { max ( \l__pv_max_fp , \__pv_val:nn {#1} {#2} ) }
+  }
+\cs_new_protected:Npn \__pv_heat_cell:nn #1 #2
+  {
+    \fp_compare:nNnF \l__pv_max_fp = \l__pv_min_fp
+      {
+        \fp_set:Nn \l__pv_v_fp
+          {
+            ( \__pv_val:nn {#1} {#2} - \l__pv_min_fp )
+            / ( \l__pv_max_fp - \l__pv_min_fp )
+          }
+        \str_if_eq:VnT \l__pv_dir_tl { lower }
+          { \fp_set:Nn \l__pv_v_fp { 1 - \l__pv_v_fp } }
+        \prop_put:Nee \l__pv_heat_prop { \__pv_key:nn {#1} {#2} }
+          { \fp_eval:n { round ( 8 * \l__pv_v_fp ) } }
+      }
+  }
+
+% ---- 6. formatted content and the widest value per column
+\cs_new_protected:Npn \__pv_measure:
+  {
+    \prop_clear:N \l__pv_wd_prop
+    \prop_map_inline:Nn \l__pv_kind_prop
+      {
+        \bool_lazy_or:nnT { \str_if_eq_p:nn {##2} { n } } { \str_if_eq_p:nn {##2} { m } }
+          {
+            \__pv_format:n {##1}
+            \hbox_set:Nn \l__pv_tmp_box { \tl_use:N \l__pv_tmp_tl }
+            \__pv_col_of:w ##1 \q_stop
+            \prop_get:NVNTF \l__pv_wd_prop \l__pv_cell_tl \l__pv_tmpb_tl
+              {
+                \dim_compare:nNnT { \box_wd:N \l__pv_tmp_box } > { \l__pv_tmpb_tl }
+                  {
+                    \prop_put:NVe \l__pv_wd_prop \l__pv_cell_tl
+                      { \dim_use:N \box_wd:N \l__pv_tmp_box }
+                  }
+              }
+              {
+                \prop_put:NVe \l__pv_wd_prop \l__pv_cell_tl
+                  { \dim_use:N \box_wd:N \l__pv_tmp_box }
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__pv_col_of:w #1 , #2 \q_stop { \tl_set:Nn \l__pv_cell_tl {#2} }
+
+% Cell "r,c" with rank font and change, into \l__pv_tmp_tl.
+\cs_new_protected:Npn \__pv_format:n #1
+  {
+    \str_if_eq:eeTF { \prop_item:Nn \l__pv_kind_prop {#1} } { m }
+      { \tl_set:Nn \l__pv_tmp_tl { \__pv_na: } }
+      {
+        \tl_set:Ne \l__pv_tmp_tl { \prop_item:Nn \l__pv_cell_prop {#1} }
+        \prop_get:NnNT \l__pv_dtxt_prop {#1} \l__pv_tmpb_tl
+          {
+            \str_if_eq:VnTF \l__pv_show_tl { delta }
+              {
+                \tl_set:Ne \l__pv_tmp_tl
+                  { \exp_not:N \__pv_delta_text:nn \exp_not:V \l__pv_tmpb_tl }
+              }
+              {
+                \tl_put_right:Ne \l__pv_tmp_tl
+                  { \exp_not:N \, \exp_not:N \__pv_delta_small:nn \exp_not:V \l__pv_tmpb_tl }
+              }
+          }
+        \prop_get:NnNT \l__pv_rank_prop {#1} \l__pv_tmpb_tl
+          {
+            \tl_set:Ne \l__pv_tmp_tl
+              {
+                \exp_not:N \__pv_rank_font:nn
+                  { \l__pv_tmpb_tl } { \exp_not:V \l__pv_tmp_tl }
+              }
+          }
+      }
+  }
+
+% ---- 7. write the rows back out
+\cs_new_protected:Npn \__pv_emit:
+  {
+    \tl_clear:N \l__pv_out_tl
+    \int_step_inline:nn { \l__pv_nrows_int }
+      {
+        \__pv_row_cols:nn {##1}
+          {
+            \int_compare:nNnF {####1} = { 1 } { \tl_put_right:Nn \l__pv_out_tl { & } }
+            \tl_set:Ne \l__pv_key_tl { \__pv_key:nn {##1} {####1} }
+            \str_case_e:nnF { \prop_item:NV \l__pv_kind_prop \l__pv_key_tl }
+              {
+                { n } { \__pv_emit_value:n {####1} }
+                { m } { \__pv_emit_value:n {####1} }
+              }
+              {
+                \tl_put_right:Ne \l__pv_out_tl
+                  { \prop_item:NV \l__pv_cell_prop \l__pv_key_tl }
+              }
+          }
+        \tl_put_right:Ne \l__pv_out_tl { \prop_item:Ne \l__pv_end_prop {##1} }
+      }
+    \bool_if:NT \l__pv_debug_bool
+      { \iow_log:e { pubviz~table:~\exp_not:V \l__pv_out_tl } }
+  }
+\cs_new_protected:Npn \__pv_emit_value:n #1
+  {
+    \exp_args:NV \__pv_format:n \l__pv_key_tl
+    \tl_set:Ne \l__pv_tmpb_tl
+      {
+        \bool_if:nT { \__pv_fills_on_p: }
+          {
+            \prop_if_in:NVTF \l__pv_heat_prop \l__pv_key_tl
+              { pv-heat- \prop_item:NV \l__pv_heat_prop \l__pv_key_tl }
+              {
+                \prop_if_in:NVT \l__pv_rank_prop \l__pv_key_tl
+                  { pv-fill- \prop_item:NV \l__pv_rank_prop \l__pv_key_tl }
+              }
+          }
+      }
+    \tl_put_right:Ne \l__pv_out_tl
+      {
+        \exp_not:N \__pv_chip:nnn
+          { \l__pv_tmpb_tl }
+          { \prop_item:Ne \l__pv_wd_prop { \int_eval:n {#1} } }
+          { \exp_not:V \l__pv_tmp_tl }
+      }
+  }
+
+% ---- 8. the key under a table
+% \pvkey after a pvtable explains each mark that table shows by showing the
+% mark itself: "Best" sits in the best fill, "better" in the color of a change
+% that helps. The caption is then free to state the finding. Each table
+% records what its key needs; \pvkey replays the table's options, so the key
+% follows its mode, fill and colors.
+\tl_new:N \g__pv_key_opts_tl
+\clist_new:N \g__pv_key_ranks_clist     % ranks that got a mark
+\bool_new:N \g__pv_key_table_bool       % a pvtable came before
+\bool_new:N \g__pv_key_lower_bool       % a marked group is lower-is-better
+\bool_new:N \g__pv_key_higher_bool      % a marked group is higher-is-better
+\bool_new:N \g__pv_key_tie_bool         % two values share a mark
+\bool_new:N \g__pv_key_tie_first_bool   % two values share first place
+\bool_new:N \g__pv_key_missing_bool
+\bool_new:N \g__pv_key_delta_bool
+\bool_new:N \g__pv_key_heat_bool
+\bool_new:N \g__pv_key_ours_bool        % a method is marked \pvours
+\prop_new:N \l__pv_count_prop           % rank -> cells with it, in one group
+\seq_new:N \l__pv_key_lines_seq
+\tl_new:N \l__pv_key_line_tl
+\tl_new:N \l__pv_key_each_tl
+
+\cs_new_protected:Npn \__pv_key_reset:n #1
+  {
+    \tl_gset:Nn \g__pv_key_opts_tl {#1}
+    \clist_gclear:N \g__pv_key_ranks_clist
+    \bool_gset_true:N \g__pv_key_table_bool
+    \bool_gset_false:N \g__pv_key_lower_bool
+    \bool_gset_false:N \g__pv_key_higher_bool
+    \bool_gset_false:N \g__pv_key_tie_bool
+    \bool_gset_false:N \g__pv_key_tie_first_bool
+    \bool_gset_false:N \g__pv_key_missing_bool
+    \bool_gset_false:N \g__pv_key_delta_bool
+    \bool_gset_false:N \g__pv_key_heat_bool
+    \bool_gset_false:N \g__pv_key_ours_bool
+  }
+% After the markers are read: whether a method is marked as the paper's own.
+\cs_new_protected:Npn \__pv_key_note_ours:
+  {
+    \prop_map_inline:Nn \l__pv_flag_prop
+      { \tl_if_in:nnT {##2} { o } { \bool_gset_true:N \g__pv_key_ours_bool } }
+  }
+% After one group is ranked: which ranks it marked, ties, its direction.
+\cs_new_protected:Npn \__pv_key_note_group:
+  {
+    \prop_map_inline:Nn \l__pv_count_prop
+      {
+        \clist_if_in:NnF \g__pv_key_ranks_clist {##1}
+          { \clist_gput_right:Nn \g__pv_key_ranks_clist {##1} }
+        \int_compare:nNnT {##2} > { 1 }
+          {
+            \bool_gset_true:N \g__pv_key_tie_bool
+            \int_compare:nNnT {##1} = { 1 }
+              { \bool_gset_true:N \g__pv_key_tie_first_bool }
+          }
+      }
+    \str_if_eq:VnTF \l__pv_dir_tl { lower }
+      { \bool_gset_true:N \g__pv_key_lower_bool }
+      { \bool_gset_true:N \g__pv_key_higher_bool }
+  }
+
+\NewDocumentCommand \pvkey { O{} }
+  {
+    \bool_if:NF \g__pv_key_table_bool { \msg_error:nn { pubviz } { key-before-table } }
+    \par
+    \group_begin:
+      \__pv_apply:V \g__pv_key_opts_tl
+      \keys_set:nn { pubviz / key } {#1}
+      \__pv_key_build:
+      \bool_if:NT \l__pv_debug_bool
+        {
+          \iow_log:e
+            {
+              pubviz~key:~table~\int_use:N \g__pv_table_int :~
+              \seq_use:Nn \l__pv_key_lines_seq { ~|~ }
+            }
+        }
+      \seq_if_empty:NF \l__pv_key_lines_seq
+        {
+          \smallskip
+          \footnotesize
+          \skip_set:Nn \baselineskip { 1.5 \baselineskip }
+          \dim_zero:N \parindent
+          \centering
+          \seq_map_inline:Nn \l__pv_key_lines_seq { \mode_leave_vertical: ##1 \par }
+        }
+    \group_end:
+  }
+
+% Fills are drawn for ranks unless the table shades by value instead.
+\prg_new_conditional:Npnn \__pv_key_fills: { p , TF }
+  {
+    \bool_if:nTF { \__pv_fills_on_p: && ! \g__pv_key_heat_bool }
+      { \prg_return_true: } { \prg_return_false: }
+  }
+% A rank gets a line only when its mark shows in the table.
+\prg_new_protected_conditional:Npnn \__pv_key_visible:n #1 { T }
+  {
+    \bool_lazy_any:nTF
+      {
+        { \__pv_key_fills_p: && \int_compare_p:nNn {#1} < { 4 } }
+        { \int_compare_p:nNn {#1} = { 1 } && \l__pv_bold_best_bool }
+        { \int_compare_p:nNn {#1} = { 2 } && \__pv_underline_p: }
+      }
+      { \prg_return_true: } { \prg_return_false: }
+  }
+% #1: rank, #2: words, set with the mark of that rank.
+\cs_new_protected:Npn \__pv_key_cue:nn #1 #2
+  {
+    \__pv_key_fills:TF
+      {
+        \group_begin:
+          % A filled box, also for tables that fill the whole cell.
+          \tl_set:Nn \l__pv_fill_tl { chip }
+          \tl_set:Nn \l__pv_align_tl { c }
+          \__pv_ranked:nnn {#1} { } {#2}
+        \group_end:
+      }
+      { \__pv_rank_font:nn {#1} {#2} }
+  }
+\cs_new_protected:Npn \__pv_key_ramp:
+  {
+    \clist_map_inline:nn { 0 , 2 , 4 , 6 , 8 }
+      {
+        \group_begin:
+          \color { pv-heat-##1 }
+          \tex_vrule:D width 0.8em height 0.75em depth 0.15em
+        \group_end:
+      }
+  }
+
+\cs_new_protected:Npn \__pv_key_build:
+  {
+    \seq_clear:N \l__pv_key_lines_seq
+    \tl_set:Ne \l__pv_key_each_tl
+      {
+        \str_if_eq:VnTF \l__pv_by_tl { column }
+          { \exp_not:V \l__pv_kw_each_column_tl } { \exp_not:V \l__pv_kw_each_row_tl }
+      }
+    \clist_map_inline:nn { 1 , 2 , 3 }
+      {
+        \clist_if_in:NnT \g__pv_key_ranks_clist {##1}
+          { \__pv_key_visible:nT {##1} { \__pv_key_rank_line:n {##1} } }
+      }
+    \bool_if:NT \g__pv_key_delta_bool { \__pv_key_delta_line: }
+    \bool_if:nT { \g__pv_key_heat_bool && \__pv_fills_on_p: } { \__pv_key_heat_line: }
+    % The paper's own method gets a line only when the words for it are set:
+    % a row named "Ours" explains itself.
+    \bool_lazy_and:nnT
+      { \g__pv_key_ours_bool }
+      { ! \tl_if_empty_p:N \l__pv_key_ours_tl && ! \tl_if_empty_p:N \l__pv_ours_style_tl }
+      {
+        \seq_put_right:Ne \l__pv_key_lines_seq
+          { \exp_not:N \__pv_key_ours:n { \exp_not:V \l__pv_key_ours_tl } }
+      }
+    \bool_if:NT \g__pv_key_missing_bool
+      {
+        \seq_put_right:Ne \l__pv_key_lines_seq
+          { \exp_not:N \__pv_na: \c_space_tl \exp_not:V \l__pv_key_missing_tl }
+      }
+  }
+\cs_new_protected:Npn \__pv_key_rank_line:n #1
+  {
+    \tl_set:Ne \l__pv_key_line_tl
+      {
+        \exp_not:N \__pv_key_cue:nn {#1}
+          {
+            \exp_not:v
+              { l__pv_key_ \int_case:nn {#1} { {1}{best} {2}{second} {3}{third} } _tl }
+          }
+        \c_space_tl \exp_not:V \l__pv_key_each_tl
+      }
+    \int_compare:nNnT {#1} = { 1 }
+      {
+        \bool_if:NT \g__pv_key_lower_bool
+          {
+            \tl_put_right:Ne \l__pv_key_line_tl
+              {
+                \__pv_kw_sep: \exp_not:V \l__pv_kw_open_tl
+                \bool_if:NTF \g__pv_key_higher_bool
+                  { \exp_not:V \l__pv_kw_lowest_mixed_tl } { \exp_not:V \l__pv_kw_lowest_tl }
+                \exp_not:V \l__pv_kw_close_tl
+              }
+          }
+        \bool_if:NT \g__pv_key_tie_bool
+          {
+            \tl_put_right:Ne \l__pv_key_line_tl
+              { \exp_not:V \l__pv_kw_semicolon_tl \__pv_kw_sep: \exp_not:V \l__pv_kw_ties_tl }
+          }
+      }
+    \int_compare:nNnT {#1} = { 2 }
+      {
+        \bool_if:nT
+          { \g__pv_key_tie_first_bool && \str_if_eq_p:Vn \l__pv_ties_tl { shared } }
+          {
+            \tl_put_right:Ne \l__pv_key_line_tl
+              { \exp_not:V \l__pv_kw_semicolon_tl \__pv_kw_sep: \exp_not:V \l__pv_kw_second_tied_tl }
+          }
+      }
+    \seq_put_right:NV \l__pv_key_lines_seq \l__pv_key_line_tl
+  }
+\cs_new_protected:Npn \__pv_key_delta_line:
+  {
+    \tl_set:Ne \l__pv_key_line_tl
+      {
+        \str_if_eq:VnTF \l__pv_show_tl { delta }
+          { \exp_not:V \l__pv_kw_signed_tl } { \exp_not:V \l__pv_kw_small_tl }
+        \exp_not:V \l__pv_kw_colon_tl \__pv_kw_sep:
+      }
+    \str_if_eq:VnTF \l__pv_delta_tl { relative }
+      { \__pv_key_join:VVV \l__pv_kw_against_rel_tl \l__pv_key_baseline_tl \l__pv_kw_after_rel_tl }
+      { \__pv_key_join:VVV \l__pv_kw_against_tl \l__pv_key_baseline_tl \l__pv_kw_after_tl }
+    % Only color tells better from worse; in grey the sign and arrow do.
+    \str_if_eq:VnT \l__pv_mode_tl { color }
+      {
+        \tl_put_right:Ne \l__pv_key_line_tl
+          {
+            \exp_not:V \l__pv_kw_comma_tl \__pv_kw_sep:
+            \exp_not:N \__pv_delta_text:nn { 1 } { \exp_not:V \l__pv_kw_better_tl }
+            \__pv_kw_sep: \exp_not:V \l__pv_kw_or_tl \__pv_kw_sep:
+            \exp_not:N \__pv_delta_text:nn { -1 } { \exp_not:V \l__pv_kw_worse_tl }
+          }
+      }
+    \seq_put_right:NV \l__pv_key_lines_seq \l__pv_key_line_tl
+  }
+% Append the non-empty parts of a phrase, with the language's space between.
+\cs_new_protected:Npn \__pv_key_join:nnn #1 #2 #3
+  {
+    \tl_clear:N \l__pv_key_join_tl
+    \tl_map_inline:nn { {#1} {#2} {#3} }
+      {
+        \tl_if_blank:nF {##1}
+          {
+            \tl_if_empty:NF \l__pv_key_join_tl
+              { \tl_put_right:Ne \l__pv_key_join_tl { \__pv_kw_sep: } }
+            \tl_put_right:Nn \l__pv_key_join_tl {##1}
+          }
+      }
+    \tl_put_right:NV \l__pv_key_line_tl \l__pv_key_join_tl
+  }
+\cs_generate_variant:Nn \__pv_key_join:nnn { VVV }
+% The words for the paper's own method, set in the style its name has.
+\cs_new_protected:Npn \__pv_key_ours:n #1
+  { \group_begin: \l__pv_ours_style_tl #1 \group_end: }
+\cs_new_protected:Npn \__pv_key_heat_line:
+  {
+    \tl_set:Ne \l__pv_key_line_tl
+      {
+        \str_if_eq:VnTF \l__pv_heat_tl { table }
+          { \exp_not:V \l__pv_kw_heat_table_tl }
+          {
+            \str_if_eq:VnTF \l__pv_by_tl { column }
+              { \exp_not:V \l__pv_kw_heat_column_tl } { \exp_not:V \l__pv_kw_heat_row_tl }
+          }
+        \exp_not:V \l__pv_kw_colon_tl \__pv_kw_sep:
+        \exp_not:V \l__pv_kw_worse_tl \c_space_tl
+        \exp_not:N \__pv_key_ramp: \c_space_tl \exp_not:V \l__pv_kw_better_tl
+      }
+    \seq_put_right:NV \l__pv_key_lines_seq \l__pv_key_line_tl
+  }
+
+% ======================================================================
+% Layout file for the Python figures
+% ======================================================================
+
+\iow_new:N \g__pv_layout_iow
+\tl_new:N \g__pv_body_size_tl
+\cs_new:Npn \__pv_in:n #1 { \dim_to_decimal_in_unit:nn {#1} { 1in } }
+% The body font size is known at \begin{document}. Column widths are taken
+% when the first page is shipped out: some classes (acmart sigconf, for one)
+% switch to two columns only at \maketitle.
+\AddToHook { begindocument / end }
+  {
+    \tl_gset:Ne \g__pv_body_size_tl { \f@size }
+    \bool_if:NT \g__pv_layout_bool
+      { \AddToHookNext { shipout / before } { \__pv_write_layout: } }
+  }
+\str_new:N \l__pv_json_str
+\str_new:N \l__pv_json_better_str
+\str_new:N \l__pv_json_worse_str
+\cs_generate_variant:Nn \str_replace_all:Nnn { Nee }
+% #1: a word variable, as a JSON string with quotes and backslashes escaped.
+\cs_new_protected:Npn \__pv_json_word:N #1
+  {
+    \str_set:Ne \l__pv_json_str { \tl_to_str:N #1 }
+    \str_replace_all:Nee \l__pv_json_str { \c_backslash_str } { \c_backslash_str \c_backslash_str }
+    \str_replace_all:Nee \l__pv_json_str { \tl_to_str:n { " } } { \c_backslash_str \tl_to_str:n { " } }
+  }
+\cs_new_protected:Npn \__pv_write_layout:
+  {
+    \__pv_json_word:N \l__pv_kw_better_tl
+    \str_set_eq:NN \l__pv_json_better_str \l__pv_json_str
+    \__pv_json_word:N \l__pv_kw_worse_tl
+    \str_set_eq:NN \l__pv_json_worse_str \l__pv_json_str
+    \__pv_json_word:N \l__pv_kw_crosses_tl
+    \iow_open:Nn \g__pv_layout_iow { \c_sys_jobname_str .pubviz.json }
+    \iow_now:Ne \g__pv_layout_iow
+      {
+        \c_left_brace_str
+        "columnwidth_in":~\__pv_in:n { \columnwidth } ,~
+        "textwidth_in":~\__pv_in:n { \textwidth } ,~
+        "font_size_pt":~\g__pv_body_size_tl ,~
+        "twocolumn":~\if@twocolumn true \else false \fi ,~
+        "rmfamily":~"\rmdefault" ,~
+        "sffamily":~"\sfdefault" ,~
+        "familydefault":~"\familydefault" ,~
+        "accent":~"\c_hash_str\l__pv_accent_tl" ,~
+        "pos":~"\c_hash_str\l__pv_pos_tl" ,~
+        "neg":~"\c_hash_str\l__pv_neg_tl" ,~
+        "mode":~"\l__pv_mode_tl" ,~
+        "language":~"\l__pv_language_tl" ,~
+        "words":~\c_left_brace_str
+          "better":~"\l__pv_json_better_str" ,~
+          "worse":~"\l__pv_json_worse_str" ,~
+          "crosses_zero":~"\l__pv_json_str"
+        \c_right_brace_str
+        \c_right_brace_str
+      }
+    \iow_close:N \g__pv_layout_iow
+  }
+
+% ======================================================================
+% Diagrams: \usepackage[diagrams]{pubviz}
+% ======================================================================
+% TikZ styles for method and architecture diagrams, in the colors and print
+% modes of the tables. A block is filled by role (default: only the new part
+% takes the accent) or, with "pv kinds", by kind (one light fill per kind of
+% block). Text stays dark on light fills in every case.
+
+\bool_if:NF \g__pv_diagrams_bool { \file_input_stop: }
+
+\cs_generate_variant:Nn \msg_warning:nnn { nne }
+\bool_new:N \l__pv_kinds_bool
+\box_new:N \l__pv_diagram_box
+\cs_new:Npn \pv@dfont { \l__pv_dfont_tl }
+\cs_new:Npn \pv@dnote { \l__pv_dnote_tl }
+\cs_new_protected:Npn \pv@kinds #1
+  { \bool_set:Nn \l__pv_kinds_bool { \str_if_eq_p:nn {#1} { true } } }
+% Fills are dropped in plain mode, as in the tables.
+\cs_new_protected:Npn \pv@fill #1
+  { \str_if_eq:VnF \l__pv_mode_tl { plain } { \pgfkeysalso { fill = #1 } } }
+\cs_new_protected:Npn \pv@kind #1
+  { \bool_if:NT \l__pv_kinds_bool { \pv@fill { pv-kind-#1 } } }
+% The new part: accent fill (by role) or a thick accent border (by kind),
+% always with a bold label so it reads without color.
+\cs_new_protected:Npn \pv@new
+  {
+    \str_if_eq:VnTF \l__pv_mode_tl { plain }
+      { \pgfkeysalso { line~width = 1.3pt } }
+      {
+        \bool_if:NTF \l__pv_kinds_bool
+          { \pgfkeysalso { draw = pv-strong , line~width = 1.3pt } }
+          { \pgfkeysalso { fill = pv-fill-1 } }
+      }
+    \pgfkeysalso { font = \pv@dfont \bfseries }
+  }
+
+% A diagram drawn at its printed size. It warns when it is wider than the
+% line instead of letting anything scale it down.
+\NewDocumentEnvironment { pvdiagram } { O{} }
+  {
+    \hbox_set:Nw \l__pv_diagram_box
+    \begin{tikzpicture} [ pv~diagram , #1 ]
+  }
+  {
+    \end{tikzpicture}
+    \hbox_set_end:
+    \dim_compare:nNnT { \box_wd:N \l__pv_diagram_box } > { \linewidth + 0.5pt }
+      {
+        \msg_warning:nne { pubviz } { diagram-too-wide }
+          {
+            \fp_eval:n
+              { round ( \dim_to_fp:n { \box_wd:N \l__pv_diagram_box - \linewidth } , 1 ) }
+          }
+      }
+    \mode_leave_vertical:
+    \box_use:N \l__pv_diagram_box
+  }
+
+\ExplSyntaxOff
+\RequirePackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds,arrows.meta,calc}
+\definecolor{pv-ink}{HTML}{1A1A1A}
+\definecolor{pv-line}{HTML}{3A3A3A}
+\tikzset{
+  pv diagram/.style={
+    font=\pv@dfont, color=pv-line, text=pv-ink, line width=0.6pt,
+    line cap=round, line join=round, >={Stealth[length=4pt, width=3.6pt]},
+    node distance=4mm and 5mm,
+  },
+  % Fill blocks by kind instead of by role.
+  pv kinds/.code={\pv@kinds{#1}}, pv kinds/.default=true,
+  pv block/.style={
+    draw=pv-line, fill=white, rounded corners=2.5pt, align=center,
+    inner xsep=4pt, inner ysep=3pt, minimum height=1.6em,
+  },
+  pv kind/.code={\pv@kind{#1}},
+  % A fill that plain mode drops.
+  pv fill/.code={\pv@fill{#1}},
+  pv new/.code={\pv@new},
+  % A box around blocks that belong together, such as a repeated layer.
+  pv group/.style={draw=pv-line, rounded corners=6pt, pv fill=pv-band},
+  % An operation: a circle with a plus (add), or a wave (positional encoding).
+  pv op/.style={
+    circle, draw=pv-line, fill=white, minimum size=1em, inner sep=0pt,
+    path picture={\draw[pv-line, line width=0.6pt]
+      (path picture bounding box.north) -- (path picture bounding box.south)
+      (path picture bounding box.west) -- (path picture bounding box.east);},
+  },
+  pv wave/.style={
+    circle, draw=pv-line, fill=white, minimum size=1.7em, inner sep=0pt,
+    path picture={\draw[pv-line, line width=0.6pt, shift={(path picture bounding box.center)}]
+      plot[domain=-1:1, samples=31, smooth] ({\x*0.55em}, {0.27em*sin(180*\x)});},
+  },
+  pv flow/.style={draw=pv-line, ->, rounded corners=4pt},
+  pv line/.style={draw=pv-line, rounded corners=4pt},
+  pv label/.style={align=center, inner sep=1pt},
+  % Small grey text on an edge: a tensor shape, a loss, a count.
+  pv note/.style={font=\pv@dnote, text=pv-muted, align=center, inner sep=1pt},
+  % ---- a lighter style for flows between stages ----
+  % A thin grey link with an open arrowhead; corners are rounded, so a path
+  % that branches (a bus) reads as one line.
+  pv link/.style={draw=pv-muted, rounded corners=6pt, line width=0.55pt,
+    -{Straight Barb[length=2.8pt, width=5.6pt, line width=0.55pt]}},
+  % A region behind the parts that belong together, such as blocks that
+  % repeat: a light fill and no border (a dotted border in plain mode).
+  % pv region=pv-fill-3 tints it with the accent, for the part the paper adds.
+  pv region/.code={\pv@region{#1}}, pv region/.default=pv-band,
+  % A stage title above a block; add a grey second line with \pvnote{...}.
+  pv title/.style={align=center, inner sep=1pt, font=\pv@dfont},
+  % The part the paper adds: in the accent on color pages; in grey and plain
+  % print, where the accent's grey would be lighter than the rest, in near
+  % black with a heavier line. For edges, their labels and stacks.
+  pv emph/.code={\pv@emph},
+  % A stack of layers drawn as a small picture instead of a labelled box.
+  % It is a node, so positioning (right=of) and anchors (.east) work;
+  % pv layers sets how many layers it shows.
+  pv stack/.style={rectangle, inner sep=0pt, fill=none, draw opacity=0,
+    minimum width=2*\pv@stackw+1.2pt,
+    minimum height=2*\pv@stackh+(\pv@layers-1)*\pv@stackgap+1.2pt,
+    path picture={\pv@drawstack}},
+  pv layers/.store in=\pv@layers, pv layers=6,
+  pv stack ink/.store in=\pv@stackink, pv stack ink=pv-line,
+  pv stack line/.store in=\pv@stackline, pv stack line=0.6pt,
+}
+\def\pv@stackw{6.4mm}
+\def\pv@stackh{3.1mm}
+\def\pv@stackgap{0.85mm}
+% Layers from the bottom up, each filled white so the one above covers it.
+% Path pictures ignore shifts, so each layer's center is computed instead.
+\def\pv@drawstack{%
+  \foreach \pv@i in {1,...,\pv@layers}{%
+    \coordinate (pv@layer) at ($(path picture bounding box.north)
+      +(0,{-0.6pt-\pv@stackh-(\pv@layers-\pv@i)*\pv@stackgap})$);
+    \filldraw[fill=white, draw=\pv@stackink, draw opacity=1, line width=\pv@stackline, line join=round]
+      (pv@layer) ++(-\pv@stackw,0) -- ++(\pv@stackw,\pv@stackh) -- ++(\pv@stackw,-\pv@stackh)
+      -- ++(-\pv@stackw,-\pv@stackh) -- cycle;}}
+% A small grey second line under a title: \pvnote{runs once}.
+\newcommand\pvnote[1]{{\pv@dnote\color{pv-muted}#1}}
+% A loop sign for a part that runs more than once: \pvrepeat\ run 3 times.
+\newcommand\pvrepeat{\tikz[baseline=-0.6ex, line width=0.5pt, line cap=round]
+  \draw[-{Straight Barb[length=1.3pt, width=2.8pt, line width=0.5pt]}]
+    (0.45em,0) arc[start angle=0, end angle=290, radius=0.45em];}
+\ExplSyntaxOn
+\cs_new_protected:Npn \pv@emph
+  {
+    \str_if_eq:VnTF \l__pv_mode_tl { color }
+      { \pgfkeysalso { draw = pv-strong , text = pv-strong , pv~stack~ink = pv-strong } }
+      {
+        \pgfkeysalso
+          { draw = pv-ink , text = pv-ink , line~width = 0.9pt ,
+            pv~stack~ink = pv-ink , pv~stack~line = 0.9pt }
+      }
+  }
+% The fill of a region; plain mode has no fills, so it gets a dotted border.
+\cs_new_protected:Npn \pv@region #1
+  {
+    \str_if_eq:VnTF \l__pv_mode_tl { plain }
+      { \pgfkeysalso { draw = pv-line , densely~dotted , rounded~corners = 5pt } }
+      { \pgfkeysalso { fill = #1 , draw = none , rounded~corners = 5pt } }
+  }

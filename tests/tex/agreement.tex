@@ -1,0 +1,16 @@
+% Writes every derived role for several accents and modes to the log, so that
+% tests/test_latex_agreement.py can compare them with the Python side.
+\documentclass{article}
+\usepackage{pubviz}
+\pvsetup{debug=true}
+\ExplSyntaxOn
+\clist_map_inline:nn
+  { E4AE1A, 1A73D5, 009A9A, 2E9E52, DA4339, 8254C4, 717171, FF0000, 00FF00, 0000FF, F8DC8C, 101010, FFFFFF }
+  {
+    \pvsetup { accent = #1 , mode = color }
+    \pvsetup { mode = gray }
+  }
+\ExplSyntaxOff
+\begin{document}
+x
+\end{document}

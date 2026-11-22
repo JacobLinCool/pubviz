@@ -1,0 +1,60 @@
+% The key under a table: which lines appear for which table, and the colors
+% that a table's own options set. Compiled by tests/test_latex.py.
+\documentclass{article}
+\usepackage[debug]{pubviz}
+\newcommand\leaderboard[1]{%
+  \begin{pvtable}[by=row, #1]{lcccc}
+    \toprule
+    Benchmark & \pvours Ours & A & B & C \\
+    \midrule
+    Index & 20.1 & 4.4 & 20.1 & 13.6 \\
+    Score & 46.5\% & -- & -- & 29.8\% \\
+    Latency (s) \pvdown & 1.42 & 0.91 & 1.10 & 1.38 \\
+    \bottomrule
+  \end{pvtable}
+  \pvkey\par}
+\newcommand\changes[1]{%
+  \begin{pvtable}[delta=absolute, #1]{lccc}
+    \toprule
+    Method & Acc \pvup & WER \pvdown & RTF \pvdown \\
+    \midrule
+    \pvbaseline Base & 70.1 & 12.4 & 0.31 \\
+    Prior A & 72.3 & 11.9 & 0.35 \\
+    \pvours Ours & 74.0 & 10.2 & 0.28 \\
+    \bottomrule
+  \end{pvtable}}
+\ExplSyntaxOn
+\NewDocumentCommand \logfill { } { \iow_log:e { fill-1~now:~\tl_use:c { l__pv_role_fill-1_tl } } }
+\ExplSyntaxOff
+\begin{document}
+\leaderboard{}
+\leaderboard{mode=plain, ranks=3}
+\changes{accent=1A73D5}
+\pvkey[baseline=Base]
+\logfill
+\changes{mode=gray}
+\pvkey
+\pvsetup{key/best={Top value}}
+\begin{pvtable}[heat=table]{lcccc}
+  \toprule
+  Size & 10B & 30B & 100B & 300B \\
+  \midrule
+  125M & 41.2 & 44.0 & 45.1 & 45.6 \\
+  1.3B & 48.1 & 53.9 & 57.6 & 59.8 \\
+  \bottomrule
+\end{pvtable}
+\pvkey
+% The paper's own method gets a line only once its words are set, and only
+% under a table that marks one.
+\changes{}
+\pvkey[ours={This paper's method}]
+\begin{pvtable}{lcc}
+  \toprule
+  Method & Acc & F1 \\
+  \midrule
+  A & 70.1 & 0.61 \\
+  B & 72.3 & 0.64 \\
+  \bottomrule
+\end{pvtable}
+\pvkey[ours={This paper's method}]
+\end{document}
