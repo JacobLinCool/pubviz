@@ -75,6 +75,14 @@ pip install "pubviz[pandas]"  # to pass pandas DataFrames
 The library needs matplotlib 3.10 and NumPy 2.0 or newer. Tested with TeX
 Live 2026 (pdfLaTeX, LuaLaTeX and XeLaTeX) and with Python 3.10 to 3.14.
 
+**Coding agents.** A skill teaches an agent (Claude Code, Codex and others
+that read skills) to use pubviz: setting it up, choosing the exhibit a
+result needs, and checking each one before handing it over.
+
+```sh
+npx skills add JacobLinCool/pubviz
+```
+
 ## Quick start
 
 1. Load pubviz in your paper and put a results table in `pvtable`, as in
@@ -171,8 +179,8 @@ it defines. Chinese, Japanese and Korean characters in a figure fall back to
 the first installed font for that language (PingFang, Hiragino, Apple SD
 Gothic Neo, Microsoft JhengHei or YaHei, Malgun Gothic, Noto Sans CJK…), then
 to those of the other three. Linux often has none of them; install one, such
-as the `fonts-noto-cjk` package, or matplotlib draws empty boxes. Compile a CJK paper with XeLaTeX and `xeCJK` or
-LuaLaTeX and `luatexja`.
+as the `fonts-noto-cjk` package, or matplotlib draws empty boxes. Compile a
+CJK paper with XeLaTeX and `xeCJK` or LuaLaTeX and `luatexja`.
 
 The row marked `\pvours` gets a line only when you name it, for example
 `\pvkey[ours={Our method}]`: the words are set in the same style as the
@@ -488,6 +496,7 @@ option, or for one table with `\begin{pvtable}[...]`. Two are read only once:
 ```
 latex/pubviz.sty      the LaTeX package (one file): tables, colors, key, diagram styles
 src/pubviz/           the Python library
+skills/pubviz/        the agent skill: how to set up, choose and check each exhibit
 docs/guide.md           the rules: what each table, figure and diagram is for
 docs/decision-tree.md   which exhibit to draw, as five flowcharts with the evidence for each answer
 examples/content.tex    the body of the example paper
