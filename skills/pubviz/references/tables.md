@@ -66,8 +66,8 @@ next is third) or `dense`; `fill=chip`, `cell` or `none`; `align=c`, `l`,
 ## The key
 
 `\pvkey` writes one line per mark the table shows, each opening with the
-mark itself, so the caption never describes colors. It lists only what is
-there; the note on ties appears only after a tie.
+mark itself, so the caption never describes colors. It lists only the
+marks that are there.
 
 - `\pvkey[baseline=Base]` names the reference of the changes.
 - `\pvkey[ours={Our method}]` adds a line for the `\pvours` row; a row named

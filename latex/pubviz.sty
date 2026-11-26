@@ -440,10 +440,6 @@
   {
     key/each-column .tl_set:N = \l__pv_kw_each_column_tl,
     key/each-row .tl_set:N = \l__pv_kw_each_row_tl,
-    key/lowest .tl_set:N = \l__pv_kw_lowest_tl,
-    key/lowest-mixed .tl_set:N = \l__pv_kw_lowest_mixed_tl,
-    key/ties .tl_set:N = \l__pv_kw_ties_tl,
-    key/second-tied .tl_set:N = \l__pv_kw_second_tied_tl,
     key/small-numbers .tl_set:N = \l__pv_kw_small_tl,
     key/signed-numbers .tl_set:N = \l__pv_kw_signed_tl,
     key/against .tl_set:N = \l__pv_kw_against_tl,
@@ -457,9 +453,6 @@
     key/shading-column .tl_set:N = \l__pv_kw_heat_column_tl,
     key/shading-row .tl_set:N = \l__pv_kw_heat_row_tl,
     key/shading-table .tl_set:N = \l__pv_kw_heat_table_tl,
-    key/open .tl_set:N = \l__pv_kw_open_tl,
-    key/close .tl_set:N = \l__pv_kw_close_tl,
-    key/semicolon .tl_set:N = \l__pv_kw_semicolon_tl,
     key/colon .tl_set:N = \l__pv_kw_colon_tl,
     key/comma .tl_set:N = \l__pv_kw_comma_tl,
     key/spaced .bool_set:N = \l__pv_kw_spaced_bool,
@@ -487,63 +480,53 @@
     best = Best, second = Second~best, third = Third~best,
     missing = not~reported, baseline = the~baseline,
     each-column = in~each~column, each-row = in~each~row,
-    lowest = lowest, lowest-mixed = lowest~where~lower~is~better,
-    ties = ties~share~a~mark, second-tied = none~when~first~place~is~tied,
     small-numbers = Small~numbers, signed-numbers = Signed~numbers,
     against = change~against, against-relative = relative~change~against,
     after = {}, after-relative = {},
     better = better, worse = worse, or = or, crosses-zero = interval~crosses~zero,
     shading-column = Shading~within~each~column, shading-row = Shading~within~each~row,
     shading-table = Shading~across~the~table,
-    spaced = true, open = (, close = ), semicolon = ;, colon = :, comma = {,},
+    spaced = true, colon = :, comma = {,},
   }
 \pvdefinelanguage { zh-tw }
   {
     best = 最佳, second = 次佳, third = 第三, missing = 未報告, baseline = 基準,
     each-column = 每欄, each-row = 每列,
-    lowest = 取最低, lowest-mixed = 越低越好者取最低,
-    ties = 同分共用標記, second-tied = 第一名同分時從缺,
     small-numbers = 小字, signed-numbers = 數字,
     against = 相對, against-relative = 相對, after = 的變化, after-relative = 的相對變化,
     better = 較好, worse = 較差, or = 或, crosses-zero = 區間跨過零,
     shading-column = 每欄內的底色, shading-row = 每列內的底色, shading-table = 整張表的底色,
-    spaced = false, open = （, close = ）, semicolon = ；, colon = ：, comma = ，,
+    spaced = false, colon = ：, comma = ，,
   }
 \pvdefinelanguage { zh-cn }
   {
     best = 最佳, second = 次佳, third = 第三, missing = 未报告, baseline = 基准,
     each-column = 每列, each-row = 每行,
-    lowest = 取最低, lowest-mixed = 越低越好者取最低,
-    ties = 并列共用标记, second-tied = 第一名并列时空缺,
     small-numbers = 小字, signed-numbers = 数字,
     against = 相对, against-relative = 相对, after = 的变化, after-relative = 的相对变化,
     better = 较好, worse = 较差, or = 或, crosses-zero = 区间跨过零,
     shading-column = 每列内的底色, shading-row = 每行内的底色, shading-table = 整张表的底色,
-    spaced = false, open = （, close = ）, semicolon = ；, colon = ：, comma = ，,
+    spaced = false, colon = ：, comma = ，,
   }
 \pvdefinelanguage { ja }
   {
     best = 最良, second = 次点, third = 3位, missing = 報告なし, baseline = ベースライン,
     each-column = 各列, each-row = 各行,
-    lowest = 最小値, lowest-mixed = 小さいほど良い列は最小値,
-    ties = 同値は同じ印, second-tied = 1位が同値なら該当なし,
     small-numbers = 小さな数字, signed-numbers = 符号付きの数字,
     against = {}, against-relative = {}, after = からの変化, after-relative = からの相対変化,
     better = 良い, worse = 悪い, or = ／, crosses-zero = 区間が0をまたぐ,
     shading-column = 各列内の濃淡, shading-row = 各行内の濃淡, shading-table = 表全体の濃淡,
-    spaced = false, open = （, close = ）, semicolon = 、, colon = ：, comma = 、,
+    spaced = false, colon = ：, comma = 、,
   }
 \pvdefinelanguage { ko }
   {
     best = 최고, second = 두~번째, third = 세~번째, missing = 보고되지~않음, baseline = 기준,
     each-column = 각~열, each-row = 각~행,
-    lowest = 최솟값, lowest-mixed = 낮을수록~좋은~열은~최솟값,
-    ties = 동점은~같은~표시, second-tied = 1위가~동점이면~없음,
     small-numbers = 작은~숫자, signed-numbers = 부호~있는~숫자,
     against = {}, against-relative = {}, after = 대비~변화, after-relative = 대비~상대~변화,
     better = 좋음, worse = 나쁨, or = 또는, crosses-zero = 구간이~0을~포함,
     shading-column = 각~열~안의~음영, shading-row = 각~행~안의~음영, shading-table = 표~전체의~음영,
-    spaced = true, open = (, close = ), semicolon = ;, colon = :, comma = {,},
+    spaced = true, colon = :, comma = {,},
   }
 
 \keys_set:nn { pubviz }
@@ -1193,7 +1176,7 @@
             % Nothing to mark when every value in the group is the same.
             \int_compare:nNnT { \seq_count:N \l__pv_distinct_seq } > { 1 }
               {
-                \prop_clear:N \l__pv_count_prop
+                \prop_clear:N \l__pv_marked_prop
                 \__pv_map_group:nn {##1} { \__pv_rank_cell:nn {####1} {####2} }
                 \__pv_key_note_group:
               }
@@ -1217,11 +1200,7 @@
       {
         \prop_put:Nee \l__pv_rank_prop { \__pv_key:nn {#1} {#2} }
           { \int_use:N \l__pv_rank_int }
-        \prop_put:Nee \l__pv_count_prop { \int_use:N \l__pv_rank_int }
-          {
-            \int_eval:n
-              { 0 \prop_item:Ne \l__pv_count_prop { \int_use:N \l__pv_rank_int } + 1 }
-          }
+        \prop_put:Nee \l__pv_marked_prop { \int_use:N \l__pv_rank_int } { }
       }
     \bool_if:NT \l__pv_debug_bool
       {
@@ -1502,15 +1481,11 @@
 \tl_new:N \g__pv_key_opts_tl
 \clist_new:N \g__pv_key_ranks_clist     % ranks that got a mark
 \bool_new:N \g__pv_key_table_bool       % a pvtable came before
-\bool_new:N \g__pv_key_lower_bool       % a marked group is lower-is-better
-\bool_new:N \g__pv_key_higher_bool      % a marked group is higher-is-better
-\bool_new:N \g__pv_key_tie_bool         % two values share a mark
-\bool_new:N \g__pv_key_tie_first_bool   % two values share first place
 \bool_new:N \g__pv_key_missing_bool
 \bool_new:N \g__pv_key_delta_bool
 \bool_new:N \g__pv_key_heat_bool
 \bool_new:N \g__pv_key_ours_bool        % a method is marked \pvours
-\prop_new:N \l__pv_count_prop           % rank -> cells with it, in one group
+\prop_new:N \l__pv_marked_prop          % the ranks one group marked
 \seq_new:N \l__pv_key_lines_seq
 \tl_new:N \l__pv_key_line_tl
 \tl_new:N \l__pv_key_each_tl
@@ -1520,10 +1495,6 @@
     \tl_gset:Nn \g__pv_key_opts_tl {#1}
     \clist_gclear:N \g__pv_key_ranks_clist
     \bool_gset_true:N \g__pv_key_table_bool
-    \bool_gset_false:N \g__pv_key_lower_bool
-    \bool_gset_false:N \g__pv_key_higher_bool
-    \bool_gset_false:N \g__pv_key_tie_bool
-    \bool_gset_false:N \g__pv_key_tie_first_bool
     \bool_gset_false:N \g__pv_key_missing_bool
     \bool_gset_false:N \g__pv_key_delta_bool
     \bool_gset_false:N \g__pv_key_heat_bool
@@ -1535,23 +1506,14 @@
     \prop_map_inline:Nn \l__pv_flag_prop
       { \tl_if_in:nnT {##2} { o } { \bool_gset_true:N \g__pv_key_ours_bool } }
   }
-% After one group is ranked: which ranks it marked, ties, its direction.
+% After one group is ranked: which ranks it marked.
 \cs_new_protected:Npn \__pv_key_note_group:
   {
-    \prop_map_inline:Nn \l__pv_count_prop
+    \prop_map_inline:Nn \l__pv_marked_prop
       {
         \clist_if_in:NnF \g__pv_key_ranks_clist {##1}
           { \clist_gput_right:Nn \g__pv_key_ranks_clist {##1} }
-        \int_compare:nNnT {##2} > { 1 }
-          {
-            \bool_gset_true:N \g__pv_key_tie_bool
-            \int_compare:nNnT {##1} = { 1 }
-              { \bool_gset_true:N \g__pv_key_tie_first_bool }
-          }
       }
-    \str_if_eq:VnTF \l__pv_dir_tl { lower }
-      { \bool_gset_true:N \g__pv_key_lower_bool }
-      { \bool_gset_true:N \g__pv_key_higher_bool }
   }
 
 \NewDocumentCommand \pvkey { O{} }
@@ -1654,9 +1616,12 @@
           { \exp_not:N \__pv_na: \c_space_tl \exp_not:V \l__pv_key_missing_tl }
       }
   }
+% A rank's line names its mark and what it is compared within. It says
+% nothing the table shows itself: the arrows say which way is better, and
+% tied values carry the same mark.
 \cs_new_protected:Npn \__pv_key_rank_line:n #1
   {
-    \tl_set:Ne \l__pv_key_line_tl
+    \seq_put_right:Ne \l__pv_key_lines_seq
       {
         \exp_not:N \__pv_key_cue:nn {#1}
           {
@@ -1665,34 +1630,6 @@
           }
         \c_space_tl \exp_not:V \l__pv_key_each_tl
       }
-    \int_compare:nNnT {#1} = { 1 }
-      {
-        \bool_if:NT \g__pv_key_lower_bool
-          {
-            \tl_put_right:Ne \l__pv_key_line_tl
-              {
-                \__pv_kw_sep: \exp_not:V \l__pv_kw_open_tl
-                \bool_if:NTF \g__pv_key_higher_bool
-                  { \exp_not:V \l__pv_kw_lowest_mixed_tl } { \exp_not:V \l__pv_kw_lowest_tl }
-                \exp_not:V \l__pv_kw_close_tl
-              }
-          }
-        \bool_if:NT \g__pv_key_tie_bool
-          {
-            \tl_put_right:Ne \l__pv_key_line_tl
-              { \exp_not:V \l__pv_kw_semicolon_tl \__pv_kw_sep: \exp_not:V \l__pv_kw_ties_tl }
-          }
-      }
-    \int_compare:nNnT {#1} = { 2 }
-      {
-        \bool_if:nT
-          { \g__pv_key_tie_first_bool && \str_if_eq_p:Vn \l__pv_ties_tl { shared } }
-          {
-            \tl_put_right:Ne \l__pv_key_line_tl
-              { \exp_not:V \l__pv_kw_semicolon_tl \__pv_kw_sep: \exp_not:V \l__pv_kw_second_tied_tl }
-          }
-      }
-    \seq_put_right:NV \l__pv_key_lines_seq \l__pv_key_line_tl
   }
 \cs_new_protected:Npn \__pv_key_delta_line:
   {

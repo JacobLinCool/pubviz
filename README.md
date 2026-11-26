@@ -144,9 +144,9 @@ Write the table body as usual inside `pvtable`, and put `\pvkey` after it:
 `\pvkey` puts a key under the table. Each line starts with the mark it
 explains, such as "Best" in the best fill or "better" in the color of a
 change that helps, so the caption does not have to describe colors. The key
-lists only what the table shows. The note on ties appears only when a tie
-happens, and in `plain` mode the key shows bold and underline instead of
-fills.
+has a line only for the marks the table uses, and says nothing the table
+already shows, such as a tie or which way is better. In `plain` mode the
+key shows bold and underline instead of fills.
 
 Change the words for one key, `\pvkey[best={Best reported score}]`, or for
 the whole paper, `\pvsetup{key/best={Best reported score}}`.
@@ -166,12 +166,11 @@ as well. Any other language is a set of words:
 ```
 
 A set may leave words out; those stay English. Every word is also a `key/`
-option (`key/each-column`, `key/ties`, `key/small-numbers`…), as is the
-punctuation (`key/open`, `key/close`, `key/semicolon`, `key/colon`,
-`key/comma`) and `key/spaced`, which says whether words are separated by
-spaces (English, Korean) or not (Chinese, Japanese). The definitions of the
-built-in languages at the end of the options in `pubviz.sty` list every
-key. Options set after `language` change one word.
+option (`key/each-column`, `key/each-row`, `key/small-numbers`…), as is the
+punctuation (`key/colon`, `key/comma`) and `key/spaced`, which says whether
+words are separated by spaces (English, Korean) or not (Chinese, Japanese).
+The definitions of the built-in languages at the end of the options in
+`pubviz.sty` list every key. Options set after `language` change one word.
 
 The layout file carries the language and the words a figure writes itself,
 such as the key of `pv.deltas`, so figures follow the paper in any language

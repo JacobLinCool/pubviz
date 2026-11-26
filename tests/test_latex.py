@@ -85,14 +85,16 @@ KEY = re.compile(r"pubviz key: table (\d+): (.*)")
 
 def test_key_explains_the_marks_each_table_shows(latex):
     keys = {int(t): body.split(" | ") for t, body in KEY.findall(latex("key.tex"))}
-    best = r"\__pv_key_cue:nn {1}{Best} in each row (lowest where lower is better); ties share a mark"
-    second = r"\__pv_key_cue:nn {2}{Second best} in each row; none when first place is tied"
+    # Table 1 has a tie for best and a lower-is-better row. The key says
+    # neither: the table shows both, with two equal marks and an arrow.
+    best = r"\__pv_key_cue:nn {1}{Best} in each row"
+    second = r"\__pv_key_cue:nn {2}{Second best} in each row"
     missing = r"\__pv_na:  not reported"
     assert keys[1] == [best, second, missing]
     # Plain mode gives third place no mark, so the key has no line for it.
     assert keys[2] == [best, second, missing]
     assert keys[3] == [
-        r"\__pv_key_cue:nn {1}{Best} in each column (lowest where lower is better)",
+        r"\__pv_key_cue:nn {1}{Best} in each column",
         r"\__pv_key_cue:nn {2}{Second best} in each column",
         r"Small numbers: change against Base, \__pv_delta_text:nn {1}{better} or \__pv_delta_text:nn {-1}{worse}",
     ]
@@ -112,7 +114,7 @@ def test_key_in_chinese(latex):
     log = latex("key-zh.tex", engine="xelatex")
     keys = {int(t): body.split(" | ") for t, body in KEY.findall(log)}
     assert keys[1] == [
-        r"\__pv_key_cue:nn {1}{最佳} 每欄（越低越好者取最低）",
+        r"\__pv_key_cue:nn {1}{最佳} 每欄",
         r"\__pv_key_cue:nn {2}{次佳} 每欄",
         r"小字：相對基準的變化，\__pv_delta_text:nn {1}{較好}或\__pv_delta_text:nn {-1}{較差}",
     ]
@@ -128,13 +130,13 @@ def test_key_in_other_languages(latex):
     keys = {int(t): body.split(" | ") for t, body in KEY.findall(log)}
     # Korean separates words with spaces and has no word before the baseline.
     assert keys[1] == [
-        r"\__pv_key_cue:nn {1}{최고} 각 열 (낮을수록 좋은 열은 최솟값)",
+        r"\__pv_key_cue:nn {1}{최고} 각 열",
         r"\__pv_key_cue:nn {2}{두 번째} 각 열",
         r"작은 숫자: 기준 대비 변화, \__pv_delta_text:nn {1}{좋음} 또는 \__pv_delta_text:nn {-1}{나쁨}",
     ]
     # A language defined in the document; the words it leaves out are English.
     assert keys[2] == [
-        r"\__pv_key_cue:nn {1}{Beste} in jeder Spalte (lowest where lower is better)",
+        r"\__pv_key_cue:nn {1}{Beste} in jeder Spalte",
         r"\__pv_key_cue:nn {2}{Zweitbeste} in jeder Spalte",
         r"Kleine Zahlen: Änderung gegenüber der Basis, \__pv_delta_text:nn {1}{besser} oder \__pv_delta_text:nn {-1}{schlechter}",
     ]

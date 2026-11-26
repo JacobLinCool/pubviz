@@ -82,9 +82,8 @@ are more methods or measures than a figure can hold, or when differences are
 small next to their noise.
 
 Every table that marks values gets a key under it (`\pvkey`). The key is
-written from what the table actually shows: a line for each mark in use, the
-note on ties only when a tie happens, the note on lower-is-better only when
-such a measure is marked.
+written from what the table actually shows: a line for each mark in use,
+and nothing the table already says, such as a tie or which way is better.
 
 ![A leaderboard table with its key underneath](img/leaderboard.png)
 
@@ -96,8 +95,7 @@ often that is yours.
 - Mark the best value in each benchmark with the darkest fill and bold, the
   second with a lighter fill. Mark nothing when every value is equal.
 - Tied values share a mark, and the next value takes the place after the tie
-  (two values tied for best leave no second). The key says so when a tie
-  happens.
+  (two values tied for best leave no second).
 - Group benchmarks under section rows rather than with extra rules.
 - Put the setting a number depends on (harness, version, prompt) in a small
   grey line under the benchmark name, not in a footnote.
